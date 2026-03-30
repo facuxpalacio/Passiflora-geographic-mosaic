@@ -1,1 +1,2 @@
 # Code for: "Are plant–frugivore interactions really generalized? Geography shapes a selection mosaic despite highly generalized bird assemblages"
+This repository contains data and code to reproduce analyses reported in the manuscript *Palacio FX, JF Cataudela & M Ordano (2026) Are plant–frugivore interactions really generalized? Geography shapes a selection mosaic despite highly generalized bird assemblages* 
