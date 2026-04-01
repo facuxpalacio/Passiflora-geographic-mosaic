@@ -530,7 +530,7 @@ gam.gradients <- function(
 ```
 
 # Compute selection gradients
-```{r selgrads, eval = TRUE}
+```{r selgrads, eval = FALSE}
 set.seed(1)
 popsID <- unique(plant_data$populationID)
 npops <- length(popsID)

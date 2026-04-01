@@ -1752,8 +1752,8 @@ population</h1>
 <span id="cb5-34"><a href="#cb5-34" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
 <span id="cb5-35"><a href="#cb5-35" tabindex="-1"></a>    <span class="at">x =</span> zcrop,                          </span>
 <span id="cb5-36"><a href="#cb5-36" tabindex="-1"></a>    <span class="at">estimate =</span> .estimate,</span>
-<span id="cb5-37"><a href="#cb5-37" tabindex="-1"></a>    <span class="at">lower =</span> .estimate <span class="sc">-</span> <span class="dv">2</span> <span class="sc">*</span> .se,</span>
-<span id="cb5-38"><a href="#cb5-38" tabindex="-1"></a>    <span class="at">upper =</span> .estimate <span class="sc">+</span> <span class="dv">2</span> <span class="sc">*</span> .se</span>
+<span id="cb5-37"><a href="#cb5-37" tabindex="-1"></a>    <span class="at">lower =</span> .estimate <span class="sc">-</span> <span class="dv">2</span><span class="sc">*</span>.se,</span>
+<span id="cb5-38"><a href="#cb5-38" tabindex="-1"></a>    <span class="at">upper =</span> .estimate <span class="sc">+</span> <span class="dv">2</span><span class="sc">*</span>.se</span>
 <span id="cb5-39"><a href="#cb5-39" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
 <span id="cb5-40"><a href="#cb5-40" tabindex="-1"></a>  <span class="fu">select</span>(populationID, x, estimate, lower, upper)</span>
 <span id="cb5-41"><a href="#cb5-41" tabindex="-1"></a></span>
@@ -1772,8 +1772,8 @@ population</h1>
 <span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
 <span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>    <span class="at">x =</span> zseeds,                           </span>
 <span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>    <span class="at">estimate =</span> .estimate,</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>    <span class="at">lower =</span> .estimate <span class="sc">-</span> <span class="dv">2</span> <span class="sc">*</span> .se,</span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>    <span class="at">upper =</span> .estimate <span class="sc">+</span> <span class="dv">2</span> <span class="sc">*</span> .se</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>    <span class="at">lower =</span> .estimate <span class="sc">-</span> <span class="dv">2</span><span class="sc">*</span>.se,</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>    <span class="at">upper =</span> .estimate <span class="sc">+</span> <span class="dv">2</span><span class="sc">*</span>.se</span>
 <span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
 <span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>  <span class="fu">select</span>(populationID, x, estimate, lower, upper)</span>
 <span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a></span>
@@ -1792,8 +1792,8 @@ population</h1>
 <span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
 <span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>    <span class="at">x =</span> zdiam,                           </span>
 <span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>    <span class="at">estimate =</span> .estimate,</span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>    <span class="at">lower =</span> .estimate <span class="sc">-</span> <span class="dv">2</span> <span class="sc">*</span> .se,</span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>    <span class="at">upper =</span> .estimate <span class="sc">+</span> <span class="dv">2</span> <span class="sc">*</span> .se</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>    <span class="at">lower =</span> .estimate <span class="sc">-</span> <span class="dv">2</span><span class="sc">*</span>.se,</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>    <span class="at">upper =</span> .estimate <span class="sc">+</span> <span class="dv">2</span><span class="sc">*</span>.se</span>
 <span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
 <span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>  <span class="fu">select</span>(populationID, x, estimate, lower, upper)</span>
 <span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a></span>
@@ -2160,39 +2160,41 @@ many intermediate estimates (so it’s safe for long bootstraps).</p>
 <h1><span class="header-section-number">5</span> Compute selection
 gradients</h1>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">1</span>)</span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>estimates_grads <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>npops){</span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>pop <span class="ot">&lt;-</span> <span class="fu">subset</span>(plant_data, populationID <span class="sc">==</span> popsID[i])</span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a></span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="co"># Standardized traits</span></span>
-<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>z <span class="ot">&lt;-</span> <span class="fu">scale</span>(<span class="fu">data.frame</span>(<span class="at">zcrop =</span> pop<span class="sc">$</span>fruit_crop, <span class="at">zdiam =</span> pop<span class="sc">$</span>xDiam,</span>
-<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>                 <span class="at">zseeds =</span> pop<span class="sc">$</span>xNseeds))</span>
-<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a></span>
-<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a><span class="co"># Fitness (number of pecked fruits)</span></span>
-<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a>W <span class="ot">&lt;-</span> pop<span class="sc">$</span>pecked_fruits</span>
-<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a></span>
-<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a><span class="co"># Fitness function</span></span>
-<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a>trait_fitness <span class="ot">&lt;-</span> <span class="fu">na.omit</span>(<span class="fu">data.frame</span>(z, W))</span>
-<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a>k <span class="ot">&lt;-</span> <span class="fu">round</span>((<span class="dv">1</span><span class="sc">/</span><span class="dv">4</span>)<span class="sc">*</span><span class="fu">nrow</span>(trait_fitness), <span class="dv">0</span>) <span class="co"># k = 1/4 of sample size</span></span>
-<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a>ff <span class="ot">&lt;-</span> <span class="fu">gam</span>(W <span class="sc">~</span> <span class="fu">s</span>(zcrop) <span class="sc">+</span> <span class="fu">s</span>(zdiam) <span class="sc">+</span> <span class="fu">s</span>(zseeds, <span class="at">k =</span> k),</span>
-<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a>          <span class="at">family =</span> <span class="fu">nb</span>(), <span class="at">data =</span> trait_fitness)</span>
-<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a></span>
-<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a><span class="co"># Selection gradients </span></span>
-<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a>sel.grads <span class="ot">&lt;-</span> <span class="fu">gam.gradients</span>(<span class="at">mod =</span> ff, </span>
-<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a>                       <span class="at">phenotype =</span> <span class="fu">c</span>(<span class="st">&quot;zcrop&quot;</span>, <span class="st">&quot;zdiam&quot;</span>,</span>
-<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a>                                     <span class="st">&quot;zseeds&quot;</span>), </span>
-<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a>              <span class="at">covariates =</span> <span class="cn">NULL</span>, <span class="at">standardized =</span> <span class="cn">TRUE</span>, </span>
-<span id="cb9-24"><a href="#cb9-24" tabindex="-1"></a>              <span class="at">se.method =</span> <span class="st">&quot;boot.para&quot;</span>, <span class="at">n.boot =</span> <span class="dv">1000</span>, </span>
-<span id="cb9-25"><a href="#cb9-25" tabindex="-1"></a>              <span class="at">parallel =</span> <span class="st">&quot;no&quot;</span>, <span class="at">ncpus =</span> <span class="dv">1</span>, <span class="at">refit.smooth =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb9-26"><a href="#cb9-26" tabindex="-1"></a></span>
-<span id="cb9-27"><a href="#cb9-27" tabindex="-1"></a>estimates_grads[[i]] <span class="ot">&lt;-</span> sel.grads<span class="sc">$</span>ests</span>
-<span id="cb9-28"><a href="#cb9-28" tabindex="-1"></a>}</span>
-<span id="cb9-29"><a href="#cb9-29" tabindex="-1"></a></span>
-<span id="cb9-30"><a href="#cb9-30" tabindex="-1"></a><span class="co"># Export data</span></span>
-<span id="cb9-31"><a href="#cb9-31" tabindex="-1"></a><span class="co"># for(i in 1:length(popsID)){</span></span>
-<span id="cb9-32"><a href="#cb9-32" tabindex="-1"></a><span class="co">#  write.csv(estimates_grads[[i]], paste(popsID[i], </span></span>
-<span id="cb9-33"><a href="#cb9-33" tabindex="-1"></a><span class="co"># &quot;csv&quot;, sep = &quot;.&quot;), row.names = T)</span></span>
-<span id="cb9-34"><a href="#cb9-34" tabindex="-1"></a><span class="co"># }</span></span></code></pre></div>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>popsID <span class="ot">&lt;-</span> <span class="fu">unique</span>(plant_data<span class="sc">$</span>populationID)</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>npops <span class="ot">&lt;-</span> <span class="fu">length</span>(popsID)</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>estimates_grads <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>npops){</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>pop <span class="ot">&lt;-</span> <span class="fu">subset</span>(plant_data, populationID <span class="sc">==</span> popsID[i])</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="co"># Standardized traits</span></span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>z <span class="ot">&lt;-</span> <span class="fu">scale</span>(<span class="fu">data.frame</span>(<span class="at">zcrop =</span> pop<span class="sc">$</span>fruit_crop, <span class="at">zdiam =</span> pop<span class="sc">$</span>xDiam,</span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>                 <span class="at">zseeds =</span> pop<span class="sc">$</span>xNseeds))</span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a></span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a><span class="co"># Fitness (number of pecked fruits)</span></span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a>W <span class="ot">&lt;-</span> pop<span class="sc">$</span>pecked_fruits</span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a></span>
+<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a><span class="co"># Fitness function</span></span>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a>trait_fitness <span class="ot">&lt;-</span> <span class="fu">na.omit</span>(<span class="fu">data.frame</span>(z, W))</span>
+<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a>k <span class="ot">&lt;-</span> <span class="fu">round</span>((<span class="dv">1</span><span class="sc">/</span><span class="dv">4</span>)<span class="sc">*</span><span class="fu">nrow</span>(trait_fitness), <span class="dv">0</span>) <span class="co"># k = 1/4 of sample size</span></span>
+<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a>ff <span class="ot">&lt;-</span> <span class="fu">gam</span>(W <span class="sc">~</span> <span class="fu">s</span>(zcrop) <span class="sc">+</span> <span class="fu">s</span>(zdiam) <span class="sc">+</span> <span class="fu">s</span>(zseeds, <span class="at">k =</span> k),</span>
+<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a>          <span class="at">family =</span> <span class="fu">nb</span>(), <span class="at">data =</span> trait_fitness)</span>
+<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a></span>
+<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a><span class="co"># Selection gradients </span></span>
+<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a>sel.grads <span class="ot">&lt;-</span> <span class="fu">gam.gradients</span>(<span class="at">mod =</span> ff, </span>
+<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a>                       <span class="at">phenotype =</span> <span class="fu">c</span>(<span class="st">&quot;zcrop&quot;</span>, <span class="st">&quot;zdiam&quot;</span>,</span>
+<span id="cb9-24"><a href="#cb9-24" tabindex="-1"></a>                                     <span class="st">&quot;zseeds&quot;</span>), </span>
+<span id="cb9-25"><a href="#cb9-25" tabindex="-1"></a>              <span class="at">covariates =</span> <span class="cn">NULL</span>, <span class="at">standardized =</span> <span class="cn">TRUE</span>, </span>
+<span id="cb9-26"><a href="#cb9-26" tabindex="-1"></a>              <span class="at">se.method =</span> <span class="st">&quot;boot.para&quot;</span>, <span class="at">n.boot =</span> <span class="dv">1000</span>, </span>
+<span id="cb9-27"><a href="#cb9-27" tabindex="-1"></a>              <span class="at">parallel =</span> <span class="st">&quot;no&quot;</span>, <span class="at">ncpus =</span> <span class="dv">1</span>, <span class="at">refit.smooth =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb9-28"><a href="#cb9-28" tabindex="-1"></a></span>
+<span id="cb9-29"><a href="#cb9-29" tabindex="-1"></a>estimates_grads[[i]] <span class="ot">&lt;-</span> sel.grads<span class="sc">$</span>ests</span>
+<span id="cb9-30"><a href="#cb9-30" tabindex="-1"></a>}</span>
+<span id="cb9-31"><a href="#cb9-31" tabindex="-1"></a></span>
+<span id="cb9-32"><a href="#cb9-32" tabindex="-1"></a><span class="co"># Export data</span></span>
+<span id="cb9-33"><a href="#cb9-33" tabindex="-1"></a><span class="co"># for(i in 1:length(popsID)){</span></span>
+<span id="cb9-34"><a href="#cb9-34" tabindex="-1"></a><span class="co">#  write.csv(estimates_grads[[i]], paste(popsID[i], </span></span>
+<span id="cb9-35"><a href="#cb9-35" tabindex="-1"></a><span class="co"># &quot;csv&quot;, sep = &quot;.&quot;), row.names = T)</span></span>
+<span id="cb9-36"><a href="#cb9-36" tabindex="-1"></a><span class="co"># }</span></span></code></pre></div>
 </div>
 <div id="cosine-similarity-in-linear-selection-gradients-between-populations" class="section level1" number="6">
 <h1><span class="header-section-number">6</span> Cosine similarity in
@@ -2684,7 +2686,7 @@ fit and plotting</h2>
 <pre><code>## [1] 
 ## [1] 
 ## [1] GDM Modelling Summary
-## [1] Creation Date:  Wed Apr  1 14:58:57 2026
+## [1] Creation Date:  Wed Apr  1 15:30:05 2026
 ## [1] 
 ## [1] Name:  gdmTabMod_lin
 ## [1] 
@@ -2820,7 +2822,7 @@ GDM fit and plotting</h2>
 <pre><code>## [1] 
 ## [1] 
 ## [1] GDM Modelling Summary
-## [1] Creation Date:  Wed Apr  1 14:58:57 2026
+## [1] Creation Date:  Wed Apr  1 15:30:05 2026
 ## [1] 
 ## [1] Name:  gdmTabMod_nonlin
 ## [1] 
