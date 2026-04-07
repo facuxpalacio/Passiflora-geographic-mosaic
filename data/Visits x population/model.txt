@@ -1,0 +1,54 @@
+
+model {
+
+  #### Detection model (species-specific only)
+  for (i in 1:n_species_aug) {
+    logit(p[i]) <- eta[i]
+    eta[i] ~ dnorm(mu_eta, tau_eta)
+  }
+
+  #### Ecological process
+  for (k in 1:n_pops) {          # populations
+    for (i in 1:n_species_aug) { # species
+
+      # Regional pool abundance
+      log(lambda_potential[i,k]) <- alpha[k] + beta[k]*log_pool[i,k]
+
+      # Latent inclusion
+      w_raw[i,k] ~ dbern(omega[k]*rho[i])
+
+      # Enforced biogeographic constraint
+      w[i,k] <- w_raw[i,k]*presence_by_pop[i,k]
+
+      # Expected local abundance
+      lambda_actual[i,k] <- w[i,k]*lambda_potential[i,k]
+
+      # Realized abundance (Poisson)
+      N_actual[i,k] ~ dpois(lambda_actual[i,k])
+
+      # Observations on plants
+      for (j in 1:n_plants[k]) {
+        C[i,j,k] ~ dbin(p[i], N_actual[i,k])
+      }
+    }
+
+    # Population-level parameters
+    alpha[k] ~ dnorm(mu_alpha, tau_alpha)
+    beta[k]  ~ dnorm(mu_beta,  tau_beta)
+    omega[k] ~ dbeta(2, 2)
+  }
+
+  #### Hyperpriors
+  mu_alpha ~ dnorm(0, 0.01)
+  tau_alpha <- pow(sigma_alpha, -2)
+  sigma_alpha ~ dunif(0, 10)
+
+  mu_beta ~ dnorm(0, 0.01)
+  tau_beta <- pow(sigma_beta, -2)
+  sigma_beta ~ dunif(0, 10)
+
+  mu_eta ~ dnorm(0, 0.1)
+  tau_eta <- pow(sigma_eta, -2)
+  sigma_eta ~ dunif(0, 5)
+
+}

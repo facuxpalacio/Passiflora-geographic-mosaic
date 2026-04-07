@@ -1,6 +1,6 @@
 ---
 title: "Geographic selection mosaic in Passiflora caerulea"
-author: "Facundo Palacio"
+author: "Facundo X. Palacio"
 date: "`r Sys.Date()`"
 output: html_document
 ---
