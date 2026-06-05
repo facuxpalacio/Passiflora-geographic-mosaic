@@ -876,6 +876,7 @@ hc <- hclust(ForStrat_dist, method = "average")
 plot(as.phylo(hc),
      cex = 0.7)
 
+colnames(comm) <- birdtraits$sp
 ForStratD <- comdist(comm, as.matrix(ForStrat_dist))
 
 # Fruit acquisition

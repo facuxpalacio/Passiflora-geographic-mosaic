@@ -1,5 +1,0 @@
-"0","# Filter and reorder to match
-comm <- comm[, colnames(comm) %in% rownames(traits)]
-"
-"2","Error: object 'traits' not found
-"
