@@ -1146,7 +1146,6 @@ gdmTab1 <- formatsitepair(
 # Combine predictors into a list
 distPreds_list <- list(geo_dist, 
                        beta_div_numeric,
-                       FD_hand_numeric,
                        FD_BM_numeric, 
                        FD_strat_numeric,
                        FD_harv_numeric,
