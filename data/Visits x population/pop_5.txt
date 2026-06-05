@@ -1,0 +1,17 @@
+species	MG1	MG2	MG3	MG4	MG5	MG6	MG7	MG8	MG9	MG10	MG11	MG12	MG13	MG14	MG15	MG16	MG17	MG18	MG19	MG20	MG21	MG22
+chlluc	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	2	0	1	NA	0	0	NA
+corcuc	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NA	0	0	NA
+mimsat	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	2	0	0	0	NA	0	0	NA
+myimon	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NA	0	0	NA
+parcor	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NA	0	0	NA
+pasdom	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+pipbon	0	0	NA	0	0	0	0	0	0	0	0	0	0	1	0	0	0	0	NA	0	0	NA
+pitsul	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	2	0	0	0	NA	0	0	NA
+trhsay	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NA	0	0	NA
+turruf	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NA	0	0	NA
+turama	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NA	0	0	NA
+tyrmel	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NA	0	0	NA
+tyrsav	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+salaur	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NA	0	0	NA
+salcoe	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NA	0	0	NA
+zoncap	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NA	0	0	NA
