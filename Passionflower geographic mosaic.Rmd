@@ -877,7 +877,7 @@ plot(as.phylo(hc),
      cex = 0.7)
 
 colnames(comm) <- birdtraits$sp
-ForStratD <- comdist(comm, as.matrix(ForStrat_dist))
+beta_FD_ForStrat <- comdist(comm, as.matrix(ForStrat_dist))
 
 # Fruit acquisition
 fruit_acq_dist <- dist(scale(birdtraits[, c("fruit_aerial",
@@ -889,8 +889,7 @@ hc <- hclust(fruit_acq_dist, method = "average")
 plot(as.phylo(hc),
      cex = 0.7)
 
-fruit_acqD <- comdist(comm, as.matrix(fruit_acq_dist))
-
+beta_FD_fruit_acq <- comdist(comm, as.matrix(fruit_acq_dist))
 
 ```
 
@@ -1064,7 +1063,49 @@ geo_dist$populationID <- 1:nrow(geo_dist)
 colnames(geo_dist) <- c("site", geo_dist$populationID)
 dim(geo_dist) # first column = site
 
-##### Phylogenetic distance (predictor 6)
+#### Functional diversity (foraging stratum) (predictor 6)
+FD_strat <- read.csv(here("data", "beta_FD_ForStrat.csv"))[,-1]
+rownames(FD_strat) <- colnames(FD_strat)
+
+# Order rows/columns alphabetically
+ord <- order(rownames(FD_strat))
+FD_strat <- FD_strat[ord, ord]
+
+# Create numeric site IDs
+sites_char <- rownames(FD_strat)
+sites_num  <- 1:length(FD_strat)
+
+# Create numeric-labeled distance matrix for GDM
+FD_strat_numeric <- FD_strat
+rownames(FD_strat_numeric) <- sites_num
+colnames(FD_strat_numeric) <- sites_num
+
+# Add "site" column (REQUIRED)
+FD_strat_numeric <- data.frame(site = sites_num, FD_strat_numeric)
+dim(FD_strat_numeric)
+
+#### Functional diversity (fruit harvesting) (predictor 7)
+FD_harv <- read.csv(here("data", "beta_FD_fruit_acq.csv"))[,-1]
+rownames(FD_harv) <- colnames(FD_harv)
+
+# Order rows/columns alphabetically
+ord <- order(rownames(FD_harv))
+FD_harv <- FD_strat[ord, ord]
+
+# Create numeric site IDs
+sites_char <- rownames(FD_harv)
+sites_num  <- 1:length(FD_harv)
+
+# Create numeric-labeled distance matrix for GDM
+FD_harv_numeric <- FD_harv
+rownames(FD_harv_numeric) <- sites_num
+colnames(FD_harv_numeric) <- sites_num
+
+# Add "site" column (REQUIRED)
+FD_harv_numeric <- data.frame(site = sites_num, FD_harv_numeric)
+dim(FD_harv_numeric)
+
+##### Phylogenetic distance (predictor 8)
 phyD <- read.csv(here("data", "phylo_dist.csv"))[,-1]
 
 # Order rows/columns alphabetically
@@ -1107,6 +1148,8 @@ distPreds_list <- list(geo_dist,
                        beta_div_numeric,
                        FD_hand_numeric,
                        FD_BM_numeric, 
+                       FD_strat_numeric,
+                       FD_harv_numeric,
                        phyD_numeric,
                        pop_dist) 
 
