@@ -1144,13 +1144,13 @@ gdmTab1 <- formatsitepair(
 ## predData needs to be provided, but is not actually used
 
 # Combine predictors into a list
-distPreds_list <- list(geo_dist, 
-                       beta_div_numeric,
-                       FD_BM_numeric, 
-                       FD_strat_numeric,
-                       FD_harv_numeric,
-                       phyD_numeric,
-                       pop_dist) 
+distPreds_list <- list(geo_dist = geo_dist, 
+                       beta_div = beta_div_numeric,
+                       FD_BM = FD_BM_numeric, 
+                       FD_strat = FD_strat_numeric,
+                       FD_harv = FD_harv_numeric,
+                       phylog = phyD_numeric,
+                       population = pop_dist) 
 
 # Build the GDM site-pair table
 gdmTab2 <- formatsitepair(
