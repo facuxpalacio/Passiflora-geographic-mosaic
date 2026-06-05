@@ -1,0 +1,484 @@
+# Load packages
+library(ggplot2) # for plotting
+library(dplyr) # data handling
+library(tidyr) # data handling
+library(ggrepel) # plotting layout
+library(car) # anova
+library(FD) # functional diversity
+library(funspace) # functional trait space
+library(nlme) # generalized least squares
+
+# Load data
+## Field measures
+field_measures <- read.table("C:/RD/medidas campo.txt", head = T)
+sp <- unique(field_measures$Species)
+
+## AVONET database
+avo <- read.delim("C:/RD/AVONET_birdtree_xFXP.txt")
+avo.sp <- avo[avo$Species %in% sp, ]
+
+# Means per species
+means.avo <- avo.sp %>% group_by(Species) %>% 
+  summarise(Beak.Length_Culmen = mean(Beak.Length_Culmen, na.rm = T),
+            Tarsus.Length = mean(Tarsus.Length, na.rm = T),
+            Wing.Length = mean(Wing.Length, na.rm = T))
+
+means.field <- field_measures %>% group_by(Species) %>% 
+  summarise(Beak.Length_Culmen = mean(corr_bill_length_mm, na.rm = T),
+            Tarsus.Length = mean(corr_tarsus_length_mm, na.rm = T),
+            Wing.Length = mean(corr_wing_length_mm, na.rm = T))
+
+means_measures <- data.frame(means.avo, means.field)
+
+ggplot(data = means_measures, aes(x = Beak.Length_Culmen, 
+                                  y = Beak.Length_Culmen.1)) +
+  geom_point() + xlab("Mean bill length (AVONET) (mm)") +
+  geom_abline(slope = 1, intercept = 0, 
+              color = "red", linetype = "dashed") +
+  ylab("Mean bill length (photographs) (mm)")
+
+ggplot(data = means_measures, aes(x = Tarsus.Length, 
+                                  y = Tarsus.Length.1)) +
+  geom_point() + 
+  geom_abline(slope = 1, intercept = 0, 
+              color = "red", linetype = "dashed") +
+  xlab("Mean tarsus length (AVONET) (mm)") +
+  ylab("Mean tarsus length (photographs) (mm)")
+
+ggplot(data = means_measures, aes(x = Wing.Length, 
+                                  y = Wing.Length.1)) +
+  geom_point() + xlab("Mean wing length (AVONET) (mm)") +
+  geom_abline(slope = 1, intercept = 0, 
+              color = "red", linetype = "dashed") +
+  ylab("Mean wing length (photographs) (mm)") +
+  ylim(0,100)
+    
+# Correlations field vs AVONET measurements
+cor(means_measures$Beak.Length_Culmen, 
+    means_measures$Beak.Length_Culmen.1, use = "complete.obs",
+    method = "spearman")
+
+cor(means_measures$Tarsus.Length, 
+    means_measures$Tarsus.Length.1, use = "complete.obs",
+    method = "spearman")
+
+cor(means_measures$Wing.Length, 
+    means_measures$Wing.Length.1, use = "complete.obs",
+    method = "spearman")
+
+# Deviations from the 1:1 line
+mBill <- lm(Beak.Length_Culmen.1 ~ Beak.Length_Culmen, 
+            data = means_measures)
+linearHypothesis(mBill, c("(Intercept) = 0", 
+                          "Beak.Length_Culmen = 1"))
+
+mTarsus <- lm(Tarsus.Length.1 ~ Tarsus.Length, 
+            data = means_measures)
+linearHypothesis(mTarsus, c("(Intercept) = 0", 
+                          "Tarsus.Length = 1"))
+
+mWing <- lm(Wing.Length.1 ~ Wing.Length, 
+            data = means_measures)
+linearHypothesis(mWing, c("(Intercept) = 0", 
+                          "Wing.Length = 1"))
+
+##########################################################################
+#### FD metrics comparison
+set.seed(664)
+names.matrix <- rownames(trait_matrix)
+sp <- gsub("\\..*","", names.matrix) # remove points and numbers after points
+sample_sizes <- table(sp)
+
+avo.sp <- avo[avo$Species %in% sp, ]
+avo.sp$Species <- as.factor(avo.sp$Species)
+avo.sp <- avo.sp[, c(2,4,8:9)]
+
+field_measures$survey_number <- as.factor(field_measures$survey_number)
+rownames(field_measures) <- make.names(field_measures$Species, unique = T)
+
+# Functional diversity from field photographs
+trait_matrix <- na.omit(scale(field_measures[, 15:17]))
+pca <- princomp(trait_matrix, cor = T)
+trait_space_obs <- funspace(x = pca, PCs = c(1,2), n_divisions = 300)
+plot(x = trait_space_obs, #5x5 in
+     quant.plot = F, # Plot quantile lines
+     globalContour = F,
+     pnt = T, pnt.cex = 1.5, pnt.col = rgb(0, 0, 0, alpha = 0.2))
+FRic_obs <- trait_space_obs$FD$global$FRich
+FDiv_obs <-trait_space_obs$FD$global$FDiv
+FRic_obs # Functional richness
+FDiv_obs # Functional divergence
+
+# Bootstrapping from AVONET
+nsim <- 500 # Number of simulated assemblages
+
+FD_avo <- matrix(NA, nrow = nsim, ncol = 2)
+
+for(i in 1:nsim){
+  # Sample the same species from AVONET as those observed in the assemblage
+  sample_list <- vector("list", length(sample_sizes))
+  for(j in 1:length(sample_sizes)){
+    sp_avo <- subset(na.omit(avo.sp), Species == names(sample_sizes[j]))
+    sample_list[[j]] <- sp_avo[sample(1:nrow(sp_avo), size = sample_sizes[j], replace = T), ]
+  }
+  
+  # Combine sampled species into a single dataframe
+  rand_traits <- do.call("rbind", sample_list)
+  rownames(rand_traits) <- make.names(rand_traits$Species, unique = T)
+  
+  # Compute functional diversity and store the results
+  pca <- princomp(rand_traits[,-1], cor = T)
+  trait_space <- funspace(x = pca, 
+                          PCs = c(1,2), n_divisions = 300)
+  
+  FD_avo[i, 1] <- trait_space$FD$global$FRich
+  FD_avo[i, 2] <- trait_space$FD$global$FDiv
+}
+
+colnames(FD_avo) <- c("FRic", "FDiv")
+
+# Histogram of simulated values
+ggplot(data = FD_avo, aes(x = FRic)) + # 4x3.5 in
+  geom_histogram(colour = "black", fill="white") +
+  geom_vline(xintercept = FRic_obs, linetype = "dashed", linewidth = 1, col = "blue")
+
+ggplot(data = FD_avo, aes(x = FDiv)) + 
+  geom_histogram(colour = "black", fill="white") +
+  geom_vline(xintercept = FDiv_obs, linetype = "dashed", size = 1, col = "blue")
+
+# P-values
+mean(FD_avo[,1]) # mean simulated richness
+sd(FD_avo[,1])
+sum(FRic_obs<FD_avo[,1])/500
+
+mean(FD_avo[,2]) # mean simulated divergence
+sd(FD_avo[,2])
+sum(FRic_obs>FD_avo[,1])/500
+
+
+##########################################################################
+## Mounted specimens measurements (experiment)
+museum <- read.table("C:/RD/museum_specimens.txt", head = T)
+means.museum <- museum %>% group_by(species) %>% 
+  summarise(beak_length_mm = mean(bill_length_mm, na.rm = T),
+            tarsus_length_mm = mean(tarsus_length_mm, na.rm = T),
+            wing_length_mm = 10*mean(wing_length_cm, na.rm = T),
+            body_length_mm = 10*mean(body_length_cm, na.rm = T))
+sp <- unique(museum$species)
+length(sp) # n species
+
+field_measures <- read.table("C:/RD/medidas campo.txt", head = T)
+field_measures$survey_number <- as.factor(field_measures$survey_number)
+rownames(field_measures) <- make.names(field_measures$Species, unique = T)
+field_measures.sp <- field_measures[field_measures$Species %in% sp, ]
+means.field <- field_measures.sp %>% group_by(Species) %>% 
+  summarise(beak_length_mm = mean(corr_bill_length_mm, na.rm = T),
+            tarsus_length_mm = mean(corr_tarsus_length_mm, na.rm = T),
+            wing_length_mm = mean(corr_wing_length_mm, na.rm = T),
+            body_length_mm = mean(corr_body_length_mm, na.rm = T))
+
+mean_measures <- data.frame(means.museum, means.field)
+
+ggplot(data = mean_measures, aes(x = beak_length_mm, 
+                                  y = beak_length_mm.1)) +
+  geom_point() + xlab("Mean bill length (museum) (mm)") +
+  geom_abline(slope = 1, intercept = 0, 
+              color = "red", linetype = "dashed") +
+  ylab("Mean bill length (photographs) (mm)")
+
+ggplot(data = mean_measures, aes(x = tarsus_length_mm, 
+                                  y = tarsus_length_mm.1)) +
+  geom_point() + 
+  geom_abline(slope = 1, intercept = 0, 
+              color = "red", linetype = "dashed") +
+  xlab("Mean tarsus length (museum) (mm)") +
+  ylab("Mean tarsus length (photographs) (mm)")
+
+ggplot(data = mean_measures, aes(x = wing_length_mm, 
+                                  y = wing_length_mm.1)) +
+  geom_point() + xlab("Mean wing length (museum) (mm)") +
+  geom_abline(slope = 1, intercept = 0, 
+              color = "red", linetype = "dashed") +
+  ylab("Mean wing length (photographs) (mm)") +
+  ylim(0,100)
+
+# Correlations field vs museum measures
+cor(mean_measures$beak_length_mm, 
+    mean_measures$beak_length_mm.1, use = "complete.obs",
+    method = "spearman")
+
+cor(mean_measures$tarsus_length_mm, 
+    mean_measures$tarsus_length_mm.1, use = "complete.obs",
+    method = "spearman")
+
+cor(mean_measures$wing_length_mm, 
+    mean_measures$wing_length_mm.1, use = "complete.obs",
+    method = "spearman")
+
+cor(mean_measures$body_length_mm, 
+    mean_measures$body_length_mm.1, use = "complete.obs",
+    method = "spearman")
+
+# Deviations from the 1:1 line
+mBill <- lm(beak_length_mm.1 ~ beak_length_mm, 
+            data = mean_measures)
+linearHypothesis(mBill, c("(Intercept) = 0", 
+                          "beak_length_mm = 1"))
+
+mTarsus <- lm(tarsus_length_mm.1 ~ tarsus_length_mm, 
+              data = mean_measures)
+linearHypothesis(mTarsus, c("(Intercept) = 0", 
+                            "tarsus_length_mm = 1"))
+
+mWing <- lm(wing_length_mm.1 ~ wing_length_mm, 
+            data = mean_measures)
+linearHypothesis(mWing, c("(Intercept) = 0", 
+                          "wing_length_mm = 1"))
+
+mBody <- lm(body_length_mm.1 ~ body_length_mm, 
+            data = medias_medidas)
+linearHypothesis(mBody, c("(Intercept) = 0", 
+                          "body_length_mm = 1"))
+
+# Functional diversity from field photographs
+sp_means <- field_measures %>% group_by(Species) %>%
+  summarise(beak_length_mm = mean(corr_bill_length_mm, na.rm = T),
+            wing_length_mm = mean(corr_wing_length_mm, na.rm = T),
+            tarsus_length_mm = mean(corr_tarsus_length_mm, na.rm = T),
+            body_length_mm = mean(corr_body_length_mm, na.rm = T))
+
+# Observed FD
+trait_matrix <- na.omit(scale(sp_means[,-1]))
+
+x <- as.matrix(dist(trait_matrix))
+pca <- princomp(trait_matrix,cor=T)
+trait_space_obs <- funspace(x = pca, PCs = c(1,2), n_divisions = 300)
+plot(x = trait_space_obs,
+     quant.plot = F, # Plot quantile lines
+     globalContour = F,
+     pnt = T, pnt.cex = 1.5, pnt.col = rgb(0, 0, 0, alpha = 0.2))
+FRic_obs <- trait_space_obs$FD$global$FRich
+FDiv_obs <-trait_space_obs$FD$global$FDiv
+FRic_obs # Functional richness
+FDiv_obs # Functional divergence
+
+# Sample sizes per species
+sp <- sp_means$Species
+museum <- read.table("C:/RD/museum_specimens.txt", head = T)
+museum.sp <- museum[museum$species %in% sp, ]
+museum.sp$Species <- as.factor(museum.sp$species)
+sample_sizes <- table(museum.sp$Species)
+museum.sp <- museum.sp[,-1]
+
+# Bootstrapping from the museum specimens
+set.seed(664)
+nsim <- 500 # Number of simulated assemblages
+
+FD <- matrix(NA, nrow = nsim, ncol = 2)
+
+for(i in 1:nsim){
+  # Sample the same species from the museum specimens as those observed in the assemblage
+  sample_list <- vector("list", length(sample_sizes))
+  for(j in 1:length(sample_sizes)){
+    sp_museum <- subset(museum.sp, Species == names(sample_sizes[j]))
+    sample_list[[j]] <- sp_museum[sample(1:nrow(sp_museum), 
+                                         size = sample_sizes[j], replace = T), ]
+  }
+  
+  # Combine sampled species into a single dataframe
+  rand_traits <- do.call("rbind", sample_list)
+  rownames(rand_traits) <- make.names(rand_traits$Species, unique = T)
+  
+  sp_means <- rand_traits %>% group_by(Species) %>%
+    summarise(xBeak.Length_Culmen = mean(bill_length_mm, na.rm = T),
+              xWing.Length = 10*mean(wing_length_cm, na.rm = T),
+              xTarsus.Length = mean(tarsus_length_mm, na.rm = T),
+              xBody.Length = 10*mean(body_length_cm, na.rm = T))
+  
+  # Compute FD and store the results
+  pca <- princomp(sp_means[,-1], cor = TRUE)
+  trait_space <- funspace(x = pca, 
+                          PCs = c(1,2), n_divisions = 300)
+  
+  FD[i, 1] <- trait_space$FD$global$FRich
+  FD[i, 2] <- trait_space$FD$global$FDiv
+}
+
+colnames(FD) <- c("FRic", "FDiv")
+
+# Histograms of simulations
+ggplot(data = FD, aes(x = FRic)) + # 4x3.5 in
+  geom_histogram(colour = "black", fill="white", bins=20) +
+  geom_vline(xintercept = FRic_obs, linetype = "dashed", 
+             linewidth = 1, col = "blue")
+
+ggplot(data = FD, aes(x = FDiv)) + 
+  geom_histogram(colour = "black", fill="white", bins=20) +
+  geom_vline(xintercept = FDiv_obs, linetype = "dashed", 
+             linewidth = 1, col = "blue")
+
+# P-values
+mean(FD[,1]); sd(FD[,1]) 
+mean(FD[,2]); sd(FD[,2])
+length(FD[,1][FD[,1]>FRic_obs])/nsim
+length(FD[,2][FD[,2]<FDiv_obs])/nsim
+
+##############################################################
+## Mounted specimen measurements (experiment)
+museum <- read.table("C:/RD/medidas museo.txt", head = T)
+museum$dist_bird_m <- museum$dist_bird_mm/1000
+estimated <- subset(museum, medida == "estimada")
+true <- subset(museum, medida == "real")
+estimated$bird_species <- as.factor(estimated$bird_species)
+true$bird_species <- as.factor(true$bird_species)
+table(estimated$bird_species) # photos per species
+
+# Density plots (7x4 in)
+
+ggplot(data = estimated, 
+       aes(x = bill_length_mm, fill = bird_species)) + 
+  geom_density(alpha = 0.5, adjust=2) +
+  theme(legend.position="none") +
+  geom_vline(data = true, 
+             aes(xintercept = bill_length_mm,
+                 group = bird_species), col = "black", 
+             size = 0.4,
+             linetype = "dashed") +
+  ylab("Density") + theme_bw()
+
+ggplot(data = estimadas, 
+       aes(x = wing_length_mm, fill = bird_species)) + 
+  geom_density(alpha = 0.5, adjust=2) +
+  theme(legend.position="none") +
+  geom_vline(data = true, 
+             aes(xintercept = wing_length_mm,
+                 group = bird_species), col = "black", 
+             size = 0.4,
+             linetype = "dashed") +
+  ylab("Density") + theme_bw()
+
+ggplot(data = estimadas, 
+       aes(x = tarsus_length_mm, fill = bird_species)) + 
+  geom_density(alpha = 0.5, adjust=2) +
+  theme(legend.position="none") +
+  geom_vline(data = true, 
+             aes(xintercept = tarsus_length_mm, 
+                 group = bird_species), col = "black", 
+             size = 0.4,
+             linetype = "dashed") +
+  ylab("Density") + theme_bw()
+
+ggplot(data = estimadas, 
+       aes(x = body_length_mm, fill = bird_species)) + 
+  geom_density(alpha = 0.5, adjust=2) +
+  #facet_wrap(~bird_species, scales = "free_y") +
+  theme(legend.position="none") +
+  geom_vline(data = true, 
+             aes(xintercept = body_length_mm,
+                 group = bird_species), col = "black", 
+             size = 0.4,
+             linetype = "dashed") +
+  ylab("Density") + theme_bw()
+
+# Subset species
+passer <- subset(museum, bird_species == "Passer_domesticus")
+milvago <- subset(museum, bird_species == "Milvago_chimango")
+turdus <- subset(museum, bird_species == "Turdus_rufiventris")
+colaptes <- subset(museum, bird_species == "Colaptes_campestris")
+
+# Function to estimate bias (obs = trait, true = true value, est = data frame with covariates)
+bias <- function(obs_values, true, est){
+  output <- vector("list", 5)
+  
+  obs <- est[[obs_values]]
+  
+  # Compute bias y handle Inf/NaN
+  bias_trait <- 100*abs((obs - true))/obs
+  bias_trait[!is.finite(bias_trait)] <- NA
+  
+  est$bias_trait <- bias_trait
+  
+  # Resumen general
+  output[[1]] <- data.frame(
+    mean_bias = round(mean(bias_trait, na.rm = TRUE), 2),
+    sd_bias   = round(sd(bias_trait, na.rm = TRUE), 2)
+  )
+  
+  # Filtrar datos completos
+  est_model <- est[complete.cases(est[, c("bias_trait", 
+                                          "dist_bird_m", 
+                                          "angle_degrees", 
+                                          "angle_height")]), ]
+
+  
+  # Modelo GLS
+  bias_model <- nlme::gls(
+    bias_trait ~ dist_bird_m + angle_degrees + angle_height,
+    data = est_model,
+    weights = varPower(form = ~ angle_degrees + 1e-6)
+  )
+  
+  output[[2]] <- summary(bias_model)
+  
+  # Pseudo-R2
+  output[[3]] <- 1 - (
+    var(resid(bias_model, type = "normalized")) /
+      var(est_model$bias_trait, na.rm = TRUE)
+  )
+  
+  # Summary per angle
+  angle <- sort(unique(est$angle_degrees))
+  angle_df <- matrix(NA, nrow = length(angle), ncol = 2)
+  
+  for(i in 1:length(angle)){
+    angle_subset <- subset(est, angle_degrees == angle[i])
+    angle_obs <- angle_subset[[obs_values]]
+    
+    bias_angle <- 100*abs((angle_obs - true) / angle_obs)
+    bias_angle[!is.finite(bias_angle)] <- NA
+    
+    angle_df[i, 1] <- round(mean(bias_angle, na.rm = TRUE), 2)
+    angle_df[i, 2] <- round(sd(bias_angle, na.rm = TRUE), 2)
+  }
+  
+  output[[4]] <- data.frame(
+    angle = angle,
+    mean_bias = angle_df[,1],
+    sd_bias = angle_df[,2]
+  )
+  
+  output[[5]] <- cor(est[, c("dist_bird_m", 
+                             "angle_degrees", 
+                             "angle_height")], 
+                     use = "complete.obs")
+  
+  invisible({
+    # Plot angle vs bias
+    plot(est$angle_degrees, bias_trait,
+         xlab = "Angle (degrees)", ylab = "Bias (%)")
+    abline(lm(bias_trait ~ angle_degrees, data = est), col = "red")
+    
+    # GLS residuals
+    plot(fitted(bias_model),
+         resid(bias_model, type = "normalized"),
+         xlab = "Fitted values",
+         ylab = "Normalized residuals",
+         main = "Residuals vs Fitted")
+    abline(h = 0, lty = 2, col = "blue")
+  })
+  
+  return(output)
+}
+
+
+estimated <- passer[-1, ]
+true_val <- subset(passer, medida == "real")[, "wing_length_mm"]
+
+bias(est = estimadas, 
+     obs_values = "wing_length_mm",
+     true = true_val)
+
+
+data <- bias(est = estimadas, 
+             obs_values = "wing_length_mm",
+             true = true_val)[[3]]

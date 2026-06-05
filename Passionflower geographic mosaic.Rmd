@@ -23,8 +23,11 @@ library(boot) # bootstrapping
 library(numDeriv) # partial derivatives
 library(pheatmap) # heatmaps
 library(betapart) # assemblage composition
+library(picante) # phylogenetic trees
+library(phytools) # phylogenetic trees
 library(gdm) # GDM
 library(here) # for path reading
+library(sf) # coordinate projection
 
 knitr::opts_chunk$set(
   echo = TRUE,
@@ -858,9 +861,67 @@ bodymass_diff_df <- as.data.frame(bodymass_diff)
 # write.csv(bodymass_diff_df, "beta_FD_meanBodyMass.csv")
 ```
 
+# Mean pairwise functional distances between assemblages
+```{r functional}
+rownames(birdtraits) <- birdtraits$sp
+
+# Foraging stratum
+ForStrat_dist <- dist(scale(birdtraits[, c("ForStrat.ground",
+                                           "ForStrat.understory",
+                                           "ForStrat.midhigh",
+                                           "ForStrat.canopy")]))
+hc <- hclust(ForStrat_dist, method = "average")
+
+# plot dendrogram
+plot(as.phylo(hc),
+     cex = 0.7)
+
+ForStratD <- comdist(comm, as.matrix(ForStrat_dist))
+
+# Fruit acquisition
+fruit_acq_dist <- dist(scale(birdtraits[, c("fruit_aerial",
+                                           "fruit_glean",
+                                           "fruit_ground")]))
+hc <- hclust(fruit_acq_dist, method = "average")
+
+# plot dendrogram
+plot(as.phylo(hc),
+     cex = 0.7)
+
+fruit_acqD <- comdist(comm, as.matrix(fruit_acq_dist))
+
+
+```
+
+# Mean pairwise phylogenetic distances between assemblages
+```{r phylo}
+phylo_birdTree <- read.nexus(here("data", "birdTree_phylogeny_Hackett.nex"))
+code_sp <- read.table(here("data", "code_birdTree_sp.txt"), head = T)
+
+# Create consensus tree
+cons_tree <- consensus(phylo_birdTree, p = 0.5)
+cons_tree <- consensus.edges(phylo_birdTree, cons_tree,
+                             method = "least.squares")
+plot(cons_tree, cex = 0.5)
+
+# Check and match name codes
+sum(cons_tree$tip.label %in% code_sp$birdTree)
+setdiff(cons_tree$tip.label, code_sp$birdTree)
+
+lookup <- setNames(code_sp$code, code_sp$birdTree)
+cons_tree$tip.label <- lookup[cons_tree$tip.label]
+
+# Community matrix
+comm_matrix <- read.csv(here("data", "comm_passionflower.csv"))
+comm <- comm_matrix[, -1] 
+
+# Compute mean parwise phylogenetic distances between assemblage pairs
+phyD <- comdist(comm, cophenetic(cons_tree))
+```
+
 # Generalized dissimilarity modeling
-## Prepare response and covariates
-```{r GDM}
+## Prepare response and predictors
+```{r GDM covs}
 ##### Linear gradient matrix (response 1)
 lin_grad <- read.csv(here("data", "beta_sim.csv"))
 lin_grad[, -1] <- 1 - abs(lin_grad[, -1]) # Absolute values and dissimilarity
@@ -981,9 +1042,6 @@ predData <- data.frame(
 )
 
 # Coordinate projection
-library(sf)
-
-# Convert to sf
 pts <- st_as_sf(predData, coords = c("Long", "Lat"), crs = 4326)
 
 # Project to Argentina TM (EPSG:5347)
@@ -1005,6 +1063,30 @@ geo_dist$populationID <- 1:nrow(geo_dist)
 colnames(geo_dist) <- c("site", geo_dist$populationID)
 dim(geo_dist) # first column = site
 
+##### Phylogenetic distance (predictor 6)
+phyD <- read.csv(here("data", "phylo_dist.csv"))[,-1]
+
+# Order rows/columns alphabetically
+ord <- order(rownames(phyD))
+phyD <- phyD[ord, ord]
+
+# Create numeric site IDs
+sites_char <- rownames(phyD)
+sites_num  <- 1:length(sites_char)
+
+# Create numeric-labeled distance matrix for GDM
+phyD_numeric <- phyD
+rownames(phyD_numeric) <- sites_num
+colnames(phyD_numeric) <- sites_num
+
+# Add "site" column (REQUIRED)
+phyD_numeric <- data.frame(site = sites_num, 
+                                  phyD_numeric)
+
+```
+
+## Combine predictors into gdm format
+```{r GDM list}
 # Create initial site-pair table for linear gradients (bioFormat = 3)
 gdmTab1 <- formatsitepair(
   bioData = lin_grad,     # biological distance matrix + site column
@@ -1024,6 +1106,7 @@ distPreds_list <- list(geo_dist,
                        beta_div_numeric,
                        FD_hand_numeric,
                        FD_BM_numeric, 
+                       phyD_numeric,
                        pop_dist) 
 
 # Build the GDM site-pair table
