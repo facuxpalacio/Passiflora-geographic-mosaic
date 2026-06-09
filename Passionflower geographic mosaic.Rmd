@@ -863,9 +863,27 @@ bodymass_diff_df <- as.data.frame(bodymass_diff)
 
 # Mean pairwise functional distances between assemblages
 ```{r functional}
+birdtraits <- read.table(here("data", "frugivore_traits.txt"), head = T)
+
+comm_matrix <- read.csv(here("data", "comm_passionflower.csv"))
+comm <- comm_matrix[,-1]
+rownames(comm) <- comm_matrix$X
 rownames(birdtraits) <- birdtraits$sp
 
-# Foraging stratum
+#### Body mass
+Body_dist <- dist(scale(birdtraits[, "BodyMass.Value"]))
+attr(Body_dist, "Labels") <- birdtraits$sp
+hc <- hclust(Body_dist, method = "average")
+
+# plot dendrogram
+plot(as.phylo(hc),
+     cex = 0.7)
+
+colnames(comm) <- birdtraits$sp
+beta_FD_Body <- comdist(comm, as.matrix(Body_dist),
+                         abundance.weighted = TRUE)
+
+#### Foraging stratum
 ForStrat_dist <- dist(scale(birdtraits[, c("ForStrat.ground",
                                            "ForStrat.understory",
                                            "ForStrat.midhigh",
@@ -877,9 +895,10 @@ plot(as.phylo(hc),
      cex = 0.7)
 
 colnames(comm) <- birdtraits$sp
-beta_FD_ForStrat <- comdist(comm, as.matrix(ForStrat_dist))
+beta_FD_ForStrat <- comdist(comm, as.matrix(ForStrat_dist),
+                             abundance.weighted = TRUE)
 
-# Fruit acquisition
+#### Fruit acquisition
 fruit_acq_dist <- dist(scale(birdtraits[, c("fruit_aerial",
                                            "fruit_glean",
                                            "fruit_ground")]))
@@ -889,7 +908,8 @@ hc <- hclust(fruit_acq_dist, method = "average")
 plot(as.phylo(hc),
      cex = 0.7)
 
-beta_FD_fruit_acq <- comdist(comm, as.matrix(fruit_acq_dist))
+beta_FD_fruit_acq <- comdist(comm, as.matrix(fruit_acq_dist),
+                              abundance.weighted = TRUE)
 
 ```
 
@@ -916,7 +936,7 @@ comm_matrix <- read.csv(here("data", "comm_passionflower.csv"))
 comm <- comm_matrix[, -1] 
 
 # Compute mean parwise phylogenetic distances between assemblage pairs
-phyD <- comdist(comm, cophenetic(cons_tree))
+phyD <- comdist(comm, cophenetic(cons_tree), abundance.weighted = T)
 ```
 
 # Generalized dissimilarity modeling
@@ -958,28 +978,7 @@ colnames(beta_div_numeric) <- sites_num
 beta_div_numeric <- data.frame(site = sites_num, 
                                beta_div_numeric)
 
-#### Functional diversity (proportion of gulpers) (predictor 2) 
-FD_hand <- read.csv(here("data", "beta_FD_propGulpers.csv"))[,-1]
-rownames(FD_hand) <- colnames(FD_hand)
-dim(FD_hand)
-
-# Order rows/columns alphabetically
-ord <- order(rownames(FD_hand))
-FD_hand <- FD_hand[ord, ord]
-
-# Create numeric site IDs
-sites_char <- rownames(FD_hand)
-sites_num  <- 1:length(FD_hand)
-
-# Create numeric-labeled distance matrix for GDM
-FD_hand_numeric <- FD_hand
-rownames(FD_hand_numeric) <- sites_num
-colnames(FD_hand_numeric) <- sites_num
-
-# Add "site" column (REQUIRED)
-FD_hand_numeric <- data.frame(site = sites_num, FD_hand_numeric)
-
-#### Functional diversity (mean body mass) (predictor 3)
+#### Functional diversity (mean body mass) (predictor 2)
 FD_BM <- read.csv(here("data", "beta_FD_meanBodyMass.csv"))[,-1]
 rownames(FD_BM) <- colnames(FD_BM)
 
@@ -1000,7 +999,49 @@ colnames(FD_BM_numeric) <- sites_num
 FD_BM_numeric <- data.frame(site = sites_num, FD_BM_numeric)
 dim(FD_BM_numeric)
 
-##### Population density (predictor 4)
+#### Functional diversity (foraging stratum) (predictor 3)
+FD_strat <- read.csv(here("data", "beta_FD_ForStrat.csv"))[,-1]
+rownames(FD_strat) <- colnames(FD_strat)
+
+# Order rows/columns alphabetically
+ord <- order(rownames(FD_strat))
+FD_strat <- FD_strat[ord, ord]
+
+# Create numeric site IDs
+sites_char <- rownames(FD_strat)
+sites_num  <- 1:length(FD_strat)
+
+# Create numeric-labeled distance matrix for GDM
+FD_strat_numeric <- FD_strat
+rownames(FD_strat_numeric) <- sites_num
+colnames(FD_strat_numeric) <- sites_num
+
+# Add "site" column (REQUIRED)
+FD_strat_numeric <- data.frame(site = sites_num, FD_strat_numeric)
+dim(FD_strat_numeric)
+
+#### Functional diversity (fruit harvesting) (predictor 4)
+FD_harv <- read.csv(here("data", "beta_FD_fruit_acq.csv"))[,-1]
+rownames(FD_harv) <- colnames(FD_harv)
+
+# Order rows/columns alphabetically
+ord <- order(rownames(FD_harv))
+FD_harv <- FD_strat[ord, ord]
+
+# Create numeric site IDs
+sites_char <- rownames(FD_harv)
+sites_num  <- 1:length(FD_harv)
+
+# Create numeric-labeled distance matrix for GDM
+FD_harv_numeric <- FD_harv
+rownames(FD_harv_numeric) <- sites_num
+colnames(FD_harv_numeric) <- sites_num
+
+# Add "site" column (REQUIRED)
+FD_harv_numeric <- data.frame(site = sites_num, FD_harv_numeric)
+dim(FD_harv_numeric)
+
+##### Population density (predictor 5)
 populationID <- c("Carlos_Pellegrini", "El_Carmen", "El_Rodeo", 
                   "La_Plata", "La_Paz", "Magdalena", "Ranchos",
                   "Tucuman", "Santa_Fe","Sauce_Montrull")
@@ -1020,7 +1061,7 @@ pop_dist$populationID <- 1:nrow(pop_dist)
 colnames(pop_dist) <- c("site", pop_dist$populationID)
 dim(pop_dist) # first column = site
 
-##### Geographic coordinates (predictor 5)
+##### Geographic coordinates (predictor 6)
 plant_data <- read.csv(here("data", "Passionflower_pops.csv"))
 
 coords <- plant_data %>% 
@@ -1063,49 +1104,7 @@ geo_dist$populationID <- 1:nrow(geo_dist)
 colnames(geo_dist) <- c("site", geo_dist$populationID)
 dim(geo_dist) # first column = site
 
-#### Functional diversity (foraging stratum) (predictor 6)
-FD_strat <- read.csv(here("data", "beta_FD_ForStrat.csv"))[,-1]
-rownames(FD_strat) <- colnames(FD_strat)
-
-# Order rows/columns alphabetically
-ord <- order(rownames(FD_strat))
-FD_strat <- FD_strat[ord, ord]
-
-# Create numeric site IDs
-sites_char <- rownames(FD_strat)
-sites_num  <- 1:length(FD_strat)
-
-# Create numeric-labeled distance matrix for GDM
-FD_strat_numeric <- FD_strat
-rownames(FD_strat_numeric) <- sites_num
-colnames(FD_strat_numeric) <- sites_num
-
-# Add "site" column (REQUIRED)
-FD_strat_numeric <- data.frame(site = sites_num, FD_strat_numeric)
-dim(FD_strat_numeric)
-
-#### Functional diversity (fruit harvesting) (predictor 7)
-FD_harv <- read.csv(here("data", "beta_FD_fruit_acq.csv"))[,-1]
-rownames(FD_harv) <- colnames(FD_harv)
-
-# Order rows/columns alphabetically
-ord <- order(rownames(FD_harv))
-FD_harv <- FD_strat[ord, ord]
-
-# Create numeric site IDs
-sites_char <- rownames(FD_harv)
-sites_num  <- 1:length(FD_harv)
-
-# Create numeric-labeled distance matrix for GDM
-FD_harv_numeric <- FD_harv
-rownames(FD_harv_numeric) <- sites_num
-colnames(FD_harv_numeric) <- sites_num
-
-# Add "site" column (REQUIRED)
-FD_harv_numeric <- data.frame(site = sites_num, FD_harv_numeric)
-dim(FD_harv_numeric)
-
-##### Phylogenetic distance (predictor 8)
+##### Phylogenetic distance (predictor 7)
 phyD <- read.csv(here("data", "phylo_dist.csv"))[,-1]
 
 # Order rows/columns alphabetically
@@ -1179,7 +1178,7 @@ summary(gdmTabMod_lin)
 # Plots 
 gdm.1.splineDat <- isplineExtract(gdmTabMod_lin)
 df_spline_geo <- data.frame(x = gdm.1.splineDat$x[, "matrix_1"], 
-                        y = gdm.1.splineDat$y[, "matrix_1"]) 
+                            y = gdm.1.splineDat$y[, "matrix_1"]) 
 df_points_geo <- gdmTab2 %>%
   mutate(
     geo_dist = sqrt((s1.xCoord - s2.xCoord)^2 + (s1.yCoord - s2.yCoord)^2)
@@ -1199,6 +1198,64 @@ ggplot() +
   labs(
     x = "Geographic distance (projected meters)",
     y = "Linear gradient dissimilarity") +
+  theme_bw()
+
+gdm.2.splineDat <- isplineExtract(gdmTabMod_lin)
+df_spline_m1 <- data.frame(
+  x = gdm.2.splineDat$x[, "matrix_4"],
+  y = gdm.2.splineDat$y[, "matrix_4"]
+)
+
+df_points_m1 <- gdmTab4 %>%
+  mutate(
+    ForStrat_comp = abs(s1.matrix_4 - s2.matrix_4)
+  )
+
+ggplot() +
+  geom_point(
+    data = df_points_m1,
+    aes(x = ForStrat_comp, y = distance),
+    size = 3
+  ) +
+  geom_line(
+    data = df_spline_m1,
+    aes(x = x, y = y),
+    linewidth = 1.2
+  ) +
+  xlim(min(beta_FD_ForStrat), max(beta_FD_ForStrat)) +
+  labs(
+    x = "Foraging stratum dissimilarity (mean pairwise distance)",
+    y = "Linear gradient dissimilarity"
+  ) +
+  theme_bw()
+
+gdm.3.splineDat <- isplineExtract(gdmTabMod_lin)
+df_spline_m1 <- data.frame(
+  x = gdm.3.splineDat$x[, "matrix_6"],
+  y = gdm.3.splineDat$y[, "matrix_6"]
+)
+
+df_points_m1 <- gdmTab4 %>%
+  mutate(
+    phylo_comp = abs(s1.matrix_6 - s2.matrix_6)
+  )
+
+ggplot() +
+  geom_point(
+    data = df_points_m1,
+    aes(x = phylo_comp, y = distance),
+    size = 3
+  ) +
+  geom_line(
+    data = df_spline_m1,
+    aes(x = x, y = y),
+    linewidth = 1.2
+  ) +
+  xlim(101, 112) +
+  labs(
+    x = "Phylogenetic distance (mean pairwise distance)",
+    y = "Linear gradient dissimilarity"
+  ) +
   theme_bw()
 
 # Create initial site-pair table for nonlinear gradients (bioFormat = 3)
@@ -1245,6 +1302,7 @@ summary(gdmTabMod_nonlin)
 
 # Plots (5x4 in)
 gdm.2.splineDat <- isplineExtract(gdmTabMod_nonlin)
+
 df_spline_m1 <- data.frame(
   x = gdm.2.splineDat$x[, "matrix_1"],
   y = gdm.2.splineDat$y[, "matrix_1"]
@@ -1252,7 +1310,7 @@ df_spline_m1 <- data.frame(
 
 df_points_m1 <- gdmTab4 %>%
   mutate(
-    beta_comp = abs(s1.matrix_1 - s2.matrix_1)
+    beta_comp = s2.matrix_1
   )
 
 ggplot() +
@@ -1273,29 +1331,30 @@ ggplot() +
   theme_bw()
 
 gdm.2.splineDat <- isplineExtract(gdmTabMod_nonlin)
-df_spline_m1 <- data.frame(
+df_spline_m2 <- data.frame(
   x = gdm.2.splineDat$x[, "matrix_4"],
   y = gdm.2.splineDat$y[, "matrix_4"]
 )
 
-df_points_m1 <- gdmTab4 %>%
+df_points_m2 <- gdmTab4 %>%
   mutate(
-    beta_comp = abs(s1.matrix_4 - s2.matrix_4)
+    ForStrat2_comp = abs(s1.matrix_4 - s2.matrix_4)
   )
 
 ggplot() +
   geom_point(
-    data = df_points_m1,
-    aes(x = beta_comp, y = distance),
+    data = df_points_m2,
+    aes(x = ForStrat2_comp, y = distance),
     size = 3
   ) +
   geom_line(
-    data = df_spline_m1,
+    data = df_spline_m2,
     aes(x = x, y = y),
     linewidth = 1.2
   ) +
+  xlim(min(beta_FD_ForStrat), max(beta_FD_ForStrat)) +
   labs(
-    x = "Mean body mass dissimilarity (g)",
+    x = "Foraging stratum dissimilarity (mean pairwise distance)",
     y = "Non-linear gradient dissimilarity"
   ) +
   theme_bw()
