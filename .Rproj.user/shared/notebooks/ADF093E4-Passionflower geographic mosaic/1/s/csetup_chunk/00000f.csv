@@ -7,7 +7,6 @@
 "0","library(boot) # bootstrapping"
 "0","library(numDeriv) # partial derivatives"
 "0","library(pheatmap) # heatmaps"
-"0","library(betapart) # assemblage composition"
 "0","library(picante) # phylogenetic trees"
 "0","library(phytools) # phylogenetic trees"
 "0","library(gdm) # GDM"

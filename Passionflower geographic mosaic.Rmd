@@ -22,7 +22,6 @@ library(gratia) # GAMs
 library(boot) # bootstrapping
 library(numDeriv) # partial derivatives
 library(pheatmap) # heatmaps
-library(betapart) # assemblage composition
 library(picante) # phylogenetic trees
 library(phytools) # phylogenetic trees
 library(gdm) # GDM
@@ -763,105 +762,7 @@ pheatmap(
 )
 ```
 
-# Beta functional diversity
-```{r beta diversity}
-birdtraits <- read.table(here("data", "frugivore_traits.txt"), head = T)
-traits <- birdtraits[, c("handling", "BodyMass.Value")]
-traits$handling_f <- ifelse(traits$handling == "gulper", 1, 0)
-rownames(traits) <- birdtraits$code
-trait_mat <- traits[, c("BodyMass.Value", "handling_f")]
-
-comm_matrix <- read.csv(here("data", "comm_passionflower.csv"))
-comm <- comm_matrix[,-1]
-comm <- 1*(comm>0) # presence-absence matrix
-rownames(comm) <- comm_matrix$X
-
-beta_FD <- functional.beta.pair(comm, trait_mat, 
-                                 index.family = "jaccard")
-# write.csv(as.matrix(beta_FD$funct.beta.jac), "beta_FD.csv")
-
-# Difference in the proportion of gulpers
-birdtraits <- read.table(here("data", "frugivore_traits.txt"),  head = TRUE)
-traits <- birdtraits[, c("handling", "BodyMass.Value")]
-# convert handling to numeric binary trait
-traits$handling_f <- ifelse(traits$handling == "gulper", 1, 0)
-rownames(traits) <- birdtraits$code
-trait_mat <- traits[, c("BodyMass.Value", "handling_f")]
-
-comm_matrix <- read.csv(here("data", "comm_passionflower.csv"))
-comm <- comm_matrix[,-1]
-rownames(comm) <- comm_matrix$X
-
-# Compute proportion of gulpers per assemblage
-# align species
-species_ok <- intersect(colnames(comm), rownames(traits))
-comm <- comm[, species_ok]
-trait_mat <- trait_mat[species_ok, ]
-# logical vector of gulpers
-is_gulper <- trait_mat$handling_f == 1
-# proportion of gulpers per site
-prop_gulpers <- rowSums(comm[, is_gulper, drop = FALSE]) /
-  rowSums(comm, na.rm = TRUE)
-# distance = absolute difference in proportions
-dist_prop <- as.matrix(dist(prop_gulpers, method = "euclidean"))
-
-# Align species between community matrix and traits
-species_ok <- intersect(colnames(comm), rownames(trait_mat))
-comm <- comm[, species_ok]
-trait_mat <- trait_mat[species_ok, ]
-
-# Binary gulper trait (0/1)
-gulper_trait <- trait_mat$handling_f
-
-# Abundance-weighted mean gulper score per assemblage
-mean_gulper_abund <- rowSums(comm*gulper_trait, na.rm = TRUE) /
-  rowSums(comm, na.rm = TRUE)
-
-# Pairwise distance: absolute difference (Euclidean in 1D)
-dist_gulper_abund <- as.matrix(
-  dist(mean_gulper_abund, method = "euclidean")
-)
-# write.csv(dist_gulper_abund, "beta_FD_propGulpers_abund.csv")
-
-# Mean body mass per population
-# Community matrix with abundances
-comm_matrix <- read.csv(here("data", "comm_passionflower.csv"))
-comm <- comm_matrix[, -1]             # remove column name if this exists
-rownames(comm) <- comm_matrix$X       # site names
-
-# Filter and reorder to match
-comm <- comm[, colnames(comm) %in% rownames(traits)]
-traits <- traits[colnames(comm), ]
-
-# Mean body mass
-mean_mass <- apply(comm, 1, function(x) {
-  species_present <- names(x)[x > 0]          # present species
-  trait_values <- traits[species_present, "BodyMass.Value"]
-  mean(trait_values, na.rm = TRUE)
-})
-
-# Matrix of absolute differences between assemblages
-n_sites <- nrow(comm)
-site_names <- rownames(comm)
-
-bodymass_diff <- matrix(
-  NA, n_sites, n_sites,
-  dimnames = list(site_names, site_names)
-)
-
-for(i in 1:n_sites){
-  for(j in 1:n_sites){
-    bodymass_diff[i, j] <-
-      abs(mean_mass[i] - mean_mass[j])
-  }
-}
-
-# Convert to data frame for GDM
-bodymass_diff_df <- as.data.frame(bodymass_diff)
-# write.csv(bodymass_diff_df, "beta_FD_meanBodyMass.csv")
-```
-
-# Mean pairwise functional distances between assemblages
+# Beta functional diversity (mean pairwise functional distances between assemblages)
 ```{r functional}
 birdtraits <- read.table(here("data", "frugivore_traits.txt"), head = T)
 
@@ -883,6 +784,11 @@ colnames(comm) <- birdtraits$sp
 beta_FD_Body <- comdist(comm, as.matrix(Body_dist),
                          abundance.weighted = TRUE)
 
+vec_body <- as.vector(beta_FD_Body[lower.tri(beta_FD_Body)])
+mean(vec_body,na.rm=T)
+sd(vec_body,na.rm=T)
+100*sd(vec_body,na.rm=T)/mean(vec_body,na.rm=T)
+
 #### Foraging stratum
 ForStrat_dist <- dist(scale(birdtraits[, c("ForStrat.ground",
                                            "ForStrat.understory",
@@ -898,6 +804,11 @@ colnames(comm) <- birdtraits$sp
 beta_FD_ForStrat <- comdist(comm, as.matrix(ForStrat_dist),
                              abundance.weighted = TRUE)
 
+vec_ForStrat <- as.vector(beta_FD_ForStrat[lower.tri(beta_FD_ForStrat)])
+mean(vec_ForStrat,na.rm=T)
+sd(vec_ForStrat,na.rm=T)
+100*sd(vec_ForStrat,na.rm=T)/mean(vec_ForStrat,na.rm=T)
+
 #### Fruit acquisition
 fruit_acq_dist <- dist(scale(birdtraits[, c("fruit_aerial",
                                            "fruit_glean",
@@ -910,6 +821,11 @@ plot(as.phylo(hc),
 
 beta_FD_fruit_acq <- comdist(comm, as.matrix(fruit_acq_dist),
                               abundance.weighted = TRUE)
+
+vec_acq <- as.vector(beta_FD_fruit_acq[lower.tri(beta_FD_fruit_acq)])
+mean(vec_acq,na.rm=T)
+sd(vec_acq,na.rm=T)
+100*sd(vec_acq,na.rm=T)/mean(vec_acq,na.rm=T)
 
 ```
 
@@ -937,6 +853,12 @@ comm <- comm_matrix[, -1]
 
 # Compute mean parwise phylogenetic distances between assemblage pairs
 phyD <- comdist(comm, cophenetic(cons_tree), abundance.weighted = T)
+
+vec_phy <- as.vector(phyD[lower.tri(phyD)])
+mean(vec_phy,na.rm=T)
+sd(vec_phy,na.rm=T)
+100*sd(vec_phy,na.rm=T)/mean(vec_phy,na.rm=T)
+
 ```
 
 # Generalized dissimilarity modeling
@@ -958,6 +880,12 @@ dim(nonlin_grad) # first column = site
 
 ##### Beta-diversity (Bray-Curtis) (predictor 1) 
 beta_div <- read.csv(here("data", "comp_div.csv"))[,-1]
+
+vec_comp <- as.vector(beta_div[lower.tri(beta_div)])
+mean(vec_comp,na.rm=T)
+sd(vec_comp,na.rm=T)
+100*sd(vec_comp,na.rm=T)/mean(vec_comp,na.rm=T)
+
 rownames(beta_div) <- colnames(beta_div)
 dim(beta_div)
 
@@ -1026,7 +954,7 @@ rownames(FD_harv) <- colnames(FD_harv)
 
 # Order rows/columns alphabetically
 ord <- order(rownames(FD_harv))
-FD_harv <- FD_strat[ord, ord]
+FD_harv <- FD_harv[ord, ord]
 
 # Create numeric site IDs
 sites_char <- rownames(FD_harv)
@@ -1042,11 +970,10 @@ FD_harv_numeric <- data.frame(site = sites_num, FD_harv_numeric)
 dim(FD_harv_numeric)
 
 ##### Population density (predictor 5)
-populationID <- c("Carlos_Pellegrini", "El_Carmen", "El_Rodeo", 
-                  "La_Plata", "La_Paz", "Magdalena", "Ranchos",
-                  "Tucuman", "Santa_Fe","Sauce_Montrull")
+populationID <- c("CP", "EC", "ER", "LZ", "LP", "MG", "RA",
+                  "SF", "SM", "TU")
 pop_density <- c(760, 134, 910, 4115, 239, 
-                 0, 874, 5445, 1507, 695)
+                 0, 874, 1507, 695, 5445)
 pop_df <- data.frame(populationID, pop_density)
 log_pop <- log(pop_df$pop_density + 1)
 
@@ -1104,6 +1031,35 @@ geo_dist$populationID <- 1:nrow(geo_dist)
 colnames(geo_dist) <- c("site", geo_dist$populationID)
 dim(geo_dist) # first column = site
 
+# Check collinearity with elevation (m a.s.l)
+populationID <- c("CP", "EC", "ER", "LZ", "LP", "MG", "RA",
+                  "SF", "SM", "TU")
+elev <- c(70, 1268, 1296, 26, 50, 
+                 10, 25, 25, 34, 430)
+
+# pairwise absolute differences
+elev_dist <- as.data.frame(
+  as.matrix(dist(elev, method = "euclidean"))
+)
+rownames(elev_dist) <- populationID
+colnames(elev_dist) <- populationID
+elev_dist <- data.frame(populationID, elev_dist)
+elev_dist$populationID <- 1:nrow(elev_dist)
+colnames(elev_dist) <- c("site", elev_dist$populationID)
+dim(elev_dist) # first column = site
+
+# mantel test between geographic distance and elevation
+elev_mat <- as.matrix(elev_dist[, -1])
+geo_mat  <- as.matrix(geo_dist[, -1])
+
+r_evel_geo <- mantel(
+  elev_mat,
+  geo_mat,
+  method = "pearson",
+  permutations = 9999
+)
+r_evel_geo
+
 ##### Phylogenetic distance (predictor 7)
 phyD <- read.csv(here("data", "phylo_dist.csv"))[,-1]
 
@@ -1125,6 +1081,20 @@ phyD_numeric <- data.frame(site = sites_num,
                                   phyD_numeric)
 
 ```
+
+scale_dist <- function(x){
+  x/max(x)
+}
+
+tax_std <- scale_dist(beta_div_numeric)
+FD_strat_std <- scale_dist(FD_strat_numeric)
+FD_BM_std <- scale_dist(FD_BM_numeric)
+phy_std <- scale_dist(phyD_numeric)
+
+mean(tax_std[lower.tri(tax_std)])
+mean(FD_strat_std[lower.tri(FD_strat_std)])
+mean(FD_BM_std[lower.tri(FD_BM_std)])
+mean(phy_std[lower.tri(phy_std)])
 
 ## Combine predictors into gdm format
 ```{r GDM list}
