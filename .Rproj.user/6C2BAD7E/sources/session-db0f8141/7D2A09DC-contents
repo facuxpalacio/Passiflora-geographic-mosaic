@@ -581,6 +581,145 @@ estimates_grads[[i]] <- sel.grads$ests
 # }
 ```
 
+# Geographic selection mosaic in space
+```{r geo_plot}
+dat <- read.table(here("data", "grads_passi.txt"), head = T)
+
+library(sf)
+library(rnaturalearth)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(scales)
+
+
+# mapa
+arg <- ne_countries(
+  scale = "medium",
+  country = "Argentina",
+  returnclass = "sf"
+)
+
+
+# Lineal gradients
+plot_dat_lin <- dat %>%
+  filter(str_detect(Parameter, "^B-")) %>%
+  mutate(
+    trait = case_when(
+      Parameter == "B-zcrop"  ~ "Fruit crop size",
+      Parameter == "B-zdiam"  ~ "Fruit size",
+      Parameter == "B-zseeds" ~ "Seed number"
+    ),
+    alpha_val = ifelse(P.value < 0.05, 1, 0.25)
+  )
+
+
+max_abs_lin <- max(abs(plot_dat_lin$estimates), na.rm = TRUE)
+
+
+ggplot() +
+  geom_sf(
+    data = arg,
+    fill = "grey95",
+    color = "grey60",
+    linewidth = 0.3
+  ) +
+  geom_point(
+    data = plot_dat_lin,
+    aes(
+      x = Long,
+      y = Lat,
+      size = abs(estimates),
+      fill = estimates,
+      alpha = alpha_val
+    ),
+    shape = 21,
+    color = "black"
+  ) +
+  scale_fill_gradientn(
+    colours = c("blue", "white", "red"),
+    values = rescale(c(-max_abs_lin, 0, max_abs_lin)),
+    name = "Linear selection\n(β)"
+  ) +
+  scale_size_continuous(
+    name = "Selection intensity"
+  ) +
+  scale_alpha_identity() +
+  facet_wrap(~trait) +
+  coord_sf(
+    xlim = range(plot_dat_lin$Long) + c(-2,2),
+    ylim = range(plot_dat_lin$Lat) + c(-2,2)
+  ) +
+  theme_classic() +
+  labs(
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme(
+    legend.position = "right"
+  )
+
+# Quadratic gradients
+plot_dat_quad <- dat %>%
+  filter(str_detect(Parameter, "^G-"),
+         !str_detect(Parameter, "-z.*-z")) %>%
+  mutate(
+    trait = case_when(
+      Parameter == "G-zcrop"  ~ "Fruit crop size",
+      Parameter == "G-zdiam"  ~ "Fruit size",
+      Parameter == "G-zseeds" ~ "Seed number"
+    ),
+    alpha_val = ifelse(P.value < 0.05, 1, 0.25)
+  )
+
+
+max_abs_quad <- max(abs(plot_dat_quad$estimates), na.rm = TRUE)
+
+ggplot() +
+  geom_sf(
+    data = arg,
+    fill = "grey95",
+    color = "grey60",
+    linewidth = 0.3
+  ) +
+  geom_point(
+    data = plot_dat_quad,
+    aes(
+      x = Long,
+      y = Lat,
+      size = abs(estimates),
+      fill = estimates,
+      alpha = alpha_val
+    ),
+    shape = 21,
+    color = "black"
+  ) +
+  scale_fill_gradientn(
+    colours = c("blue", "white", "red"),
+    values = rescale(c(-max_abs_quad, 0, max_abs_quad)),
+    name = "Quadratic selection\n(γii)"
+  ) +
+  scale_size_continuous(
+    name = "Selection intensity"
+  ) +
+  scale_alpha_identity() +
+  facet_wrap(~trait) +
+  coord_sf(
+    xlim = range(plot_dat_quad$Long) + c(-2,2),
+    ylim = range(plot_dat_quad$Lat) + c(-2,2)
+  ) +
+  theme_classic() +
+  labs(
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme(
+    legend.position = "right"
+  )
+
+```
+
+
 # Cosine similarity in linear selection gradients between populations
 function *compare_linear_gradients*:
  - pop_beta: data.frame o matrix. If data.frame must contain population id column (pop_col) OR you can pass a matrix/data.frame with rownames = population ids and pop_col = NULL.
