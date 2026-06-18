@@ -1,0 +1,6 @@
+"0","# Load plant-level data
+plant_data <- read.csv(here(""data"", ""Passionflower_pops.csv""))
+"
+"2","Error in here(""data"", ""Passionflower_pops.csv"") : 
+  could not find function ""here""
+"
