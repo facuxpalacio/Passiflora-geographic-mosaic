@@ -12,8 +12,8 @@
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "1255,12",
-        "scrollLine": "1288",
+        "cursorPosition": "1016,19",
+        "scrollLine": "1009",
         "last_setup_crc32": "db0f8141d6d92908"
     },
     "folds": "",
@@ -21,7 +21,7 @@
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1781808604602,
+    "last_content_update": 1781809841715,
     "read_only": false,
     "read_only_alternatives": []
 }
