@@ -13,6 +13,7 @@ output:
 
 # Load required packages
 ```{r setup, message=FALSE, warning=FALSE}
+library(tidyverse) # data handling
 library(dplyr) # data handling
 library(tidyr) # data handling
 library(purrr) # data handling
@@ -27,6 +28,10 @@ library(phytools) # phylogenetic trees
 library(gdm) # GDM
 library(here) # for path reading
 library(sf) # coordinate projection
+library(rnaturalearth) # maps
+library(stringr) # string handling
+library(scales) # colors
+
 
 knitr::opts_chunk$set(
   echo = TRUE,
@@ -581,28 +586,113 @@ estimates_grads[[i]] <- sel.grads$ests
 # }
 ```
 
+# Summary of selection gradients across traits
+```{r geo_plot}
+grads <- read.table(here("data", "grads_passi.txt"), head = T)
+
+df2 <- grads %>%
+  mutate(
+    sig = P.value < 0.05,
+    
+    grad_type = case_when(
+      str_detect(Parameter, "^B-") ~ "Linear",
+      str_detect(Parameter, "^G-") & !str_detect(Parameter, "-z.*-z") ~ "Quadratic",
+      str_detect(Parameter, "^G-") & str_detect(Parameter, "-z.*-z") ~ "Correlational"
+    )
+  )
+
+# Linear y quadratic
+main_df <- df2 %>%
+  filter(grad_type %in% c("Linear", "Quadratic")) %>%
+  mutate(
+    trait = str_extract(Parameter, "z[^-]+") %>%
+      str_remove("^z")
+  ) %>%
+  group_by(Population, trait, grad_type) %>%
+  summarise(
+    sig = any(sig),
+    .groups="drop"
+  )
+
+# Correlational
+corr_df <- df2 %>%
+  filter(grad_type == "Correlational") %>%
+  mutate(
+    traits = str_extract_all(Parameter, "z[a-z]+")
+  ) %>%
+  unnest(traits) %>%
+  mutate(
+    trait = str_remove(traits, "^z")
+  ) %>%
+  group_by(Population, trait, grad_type) %>%
+  summarise(
+    sig = any(sig),
+    .groups="drop"
+  )
+
+# bind
+plot_df <- bind_rows(main_df, corr_df) %>%
+  group_by(trait, grad_type, sig) %>%
+  summarise(
+    n_pop = n_distinct(Population),
+    .groups="drop"
+  ) %>%
+  mutate(
+    sig_status = ifelse(sig, "Significant", "Non-significant"),
+    grad_type = factor(
+      grad_type,
+      levels=c("Linear", "Quadratic", "Correlational")
+    )
+  ) %>%
+  complete(
+    trait,
+    grad_type,
+    sig_status,
+    fill=list(n_pop=0)
+  )
+
+plot_df <- plot_df %>%
+  mutate(
+    trait = recode(
+      trait,
+      "crop" = "Fruit crop size",
+      "diam" = "Mean fruit diameter",
+      "seeds" = "Mean seed number"
+    )
+  )
+
+ggplot(plot_df, aes(x=grad_type, y=n_pop, fill=sig_status)) +
+  geom_bar(stat="identity", color="black") +
+  facet_wrap(~trait, ncol=3) +
+  scale_fill_manual(
+    values=c(
+      "Significant"="#0072B2",
+      "Non-significant"="#E69F00"
+    ),
+    name="Selection significance"
+  ) +
+  labs(
+    x="Selection gradient type",
+    y="Number of populations"
+  ) +
+  theme_classic() +
+  theme(
+    legend.position = "none"
+  )
+
+```
+
 # Geographic selection mosaic in space
 ```{r geo_plot}
-dat <- read.table(here("data", "grads_passi.txt"), head = T)
-
-library(sf)
-library(rnaturalearth)
-library(ggplot2)
-library(dplyr)
-library(stringr)
-library(scales)
-
-
-# mapa
+# Map
 arg <- ne_countries(
   scale = "medium",
   country = "Argentina",
   returnclass = "sf"
 )
 
-
 # Lineal gradients
-plot_dat_lin <- dat %>%
+plot_dat_lin <- grads %>%
   filter(str_detect(Parameter, "^B-")) %>%
   mutate(
     trait = case_when(
@@ -613,9 +703,7 @@ plot_dat_lin <- dat %>%
     alpha_val = ifelse(P.value < 0.05, 1, 0.25)
   )
 
-
 max_abs_lin <- max(abs(plot_dat_lin$estimates), na.rm = TRUE)
-
 
 ggplot() +
   geom_sf(
@@ -660,7 +748,7 @@ ggplot() +
   )
 
 # Quadratic gradients
-plot_dat_quad <- dat %>%
+plot_dat_quad <- grads %>%
   filter(str_detect(Parameter, "^G-"),
          !str_detect(Parameter, "-z.*-z")) %>%
   mutate(
