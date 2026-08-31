@@ -14,7 +14,7 @@ output:
 # Load required packages
 ```{r setup, message=FALSE, warning=FALSE}
 library(tidyverse) # data handling
-library(dplyr) # data handling xx
+library(dplyr) # data handling
 library(tidyr) # data handling
 library(purrr) # data handling
 library(ggplot2) # plots
@@ -91,8 +91,7 @@ cors_by_pop <- lapply(populations, function(df) {
   
 })
 
-# Print results
-cors_by_pop$cor_matrix %>% map(~ round(.x, 3))
+cors_by_pop
 
 # Load plant-level data
 plant_data <- read.csv(here("data", "Passionflower_pops.csv"))
@@ -606,7 +605,7 @@ estimates_grads[[i]] <- sel.grads$ests
 }
 
 # Export data
-# for(i in 1:length(popsID)){
+# for(i in 1:npops){
 #  write.csv(estimates_grads[[i]], paste(popsID[i], 
 # "csv", sep = "."), row.names = T)
 # }
