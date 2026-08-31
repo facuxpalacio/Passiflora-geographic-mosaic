@@ -1,17 +1,23 @@
+# Load packages
+library(here)
+library(R2jags)
+library(ggplot2)
+library(patchwork)
+
 # Load datasets
 ### Degree of frugivory
-rho_df <- read.table("bird_rho.txt", head = T)
+rho_df <- read.table(here("data", "bird_rho.txt"), head = T)
 rho <- rho_df$rho
 names(rho) <- rho_df$code
 length(rho)
 
 ### Local abundance
-pool_df <- read.table("pops_pool.txt", head = T)
+pool_df <- read.table(here("data", "pops_pool.txt"), head = T)
 log_pool <- t(log(pool_df[,-c(1,2)] + 1))
 dim(log_pool)
 
 ### Binary mask for the distribution of species across populations
-presence_by_pop <- read.table("presence_by_pop.txt", head = T)
+presence_by_pop <- read.table(here("data", "presence_by_pop.txt"), head = T)
 presence_by_pop <- t(presence_by_pop[, -c(1:2)])
 dim(presence_by_pop)
 
@@ -20,10 +26,10 @@ diff_mat <- presence_by_pop - 1*t((pool_df[, -c(1:2)]>0))
 any(diff_mat == -1)
 
 ### Visits per population
-setwd("visits x population")
 files <- paste(paste("pop", 1:8, sep = "_"), ".txt", sep = "")
 list_counts <- lapply(files, function(f) {
-  dat <- read.table(f, header = TRUE)
+  dat <- dat <- read.table(here("data", "visits x population", f), 
+                           header = TRUE)
   mat <- as.matrix(dat[,-1])
   rownames(mat) <- dat[,1]
   mat
@@ -245,9 +251,7 @@ params <- c(
   "sigma_beta"
 )
 
-
 # Model fit
-library(R2jags)
 fit <- jags(
   data = data_list,
   inits = make_inits,
@@ -298,4 +302,332 @@ pred_all <- unlist(list_Nmed)
 plot(obs_all, pred_all)
 abline(a = 0, b = 1)
 
+##################################################################
+### SIMULATIONS TO TEST MODEL PERFORMANCE
+# Base simulation
+set.seed(123)
 
+post <- fit$BUGSoutput$sims.list
+
+n_species <- 20
+n_pops <- 5
+n_plants <- rep(10, n_pops)
+
+# pool regional
+log_pool <- matrix(
+  rnorm(n_species*n_pops, 2, 1),
+  n_species,
+  n_pops
+)
+
+rho <- runif(n_species,0.2,1)
+
+# true parameters
+alpha_true <- rnorm(n_pops,0,0.5)
+beta_true <- rnorm(n_pops,1,0.2)
+omega_true <- rbeta(n_pops,2,2)
+p_true <- rbeta(n_species,5,2)
+
+# Simulate local-regional presence
+presence_by_pop_true <- matrix(1,n_species,n_pops)
+
+w_true <- matrix(0,n_species,n_pops)
+
+for(i in 1:n_species){
+  for(k in 1:n_pops){
+    
+    w_true[i,k] <- rbinom(
+      1,
+      1,
+      omega_true[k]*rho[i]
+    )
+    
+  }
+}
+
+# Simulate visit number (abundance)
+lambda_true <- matrix(0,n_species,n_pops)
+
+N_true <- matrix(0,n_species,n_pops)
+
+for(i in 1:n_species){
+  for(k in 1:n_pops){
+    
+    lambda_true[i,k] <-
+      w_true[i,k]*
+      exp(alpha_true[k] +
+            beta_true[k]*log_pool[i,k])
+    
+    if(w_true[i,k]==1){
+      
+      N_true[i,k] <- rpois(
+        1,
+        lambda_true[i,k]
+      )
+      
+    } else {
+      
+      N_true[i,k] <- 0
+      
+    }
+    
+  }
+}
+
+# Simulate visits observed
+C_sim <- array(
+  0,
+  dim=c(n_species,max(n_plants),n_pops)
+)
+
+
+for(k in 1:n_pops){
+  for(i in 1:n_species){
+    for(j in 1:n_plants[k]){
+      
+      C_sim[i,j,k] <-
+        rbinom(
+          1,
+          N_true[i,k],
+          p_true[i]
+        )
+    }
+  }
+}
+
+# Add augmented species
+n_aug <- 20
+
+n_species_aug <- n_species + n_aug
+
+# New array with augmented species
+C_aug <- array(
+  0,
+  dim = c(n_species_aug,
+          max(n_plants),
+          n_pops)
+)
+
+# Copy real species
+C_aug[1:n_species,,] <- C_sim
+
+# Extend pool
+log_pool_aug <- rbind(
+  log_pool,
+  matrix(rnorm(n_aug*n_pops,2,1),
+         n_aug,
+         n_pops)
+)
+
+# Extend rho
+rho_aug <- c(
+  rho,
+  runif(n_aug,0.2,1)
+)
+
+# presence_by_pop for augmentation
+presence_aug <- matrix(
+  1,
+  n_species_aug,
+  n_pops
+)
+
+# Data list
+data_list_sim <- list(
+  C = C_aug,
+  log_pool = log_pool_aug,
+  rho = rho_aug,
+  n_species_aug = n_species_aug,
+  n_pops = n_pops,
+  n_plants = n_plants,
+  presence_by_pop = presence_aug
+)
+
+# Make inits
+make_inits_sim <- function(C, presence, rho){
+  omega_init <- runif(n_pops, 0.1, 0.9)
+  
+  # Latent presence
+  w_raw_init <- matrix(
+    0,
+    n_species_aug,
+    n_pops
+  )
+  
+  for(i in 1:n_species_aug){
+    for(k in 1:n_pops){
+      obs <- C[i,,k]
+      obs <- obs[!is.na(obs)]
+      
+      maxC <- ifelse(length(obs)==0,0,max(obs))
+      if(maxC > 0){
+        # detected species must be present
+        w_raw_init[i,k] <- 1
+      } else {
+        # possible presence
+        w_raw_init[i,k] <- rbinom(
+          1,
+          1,
+          omega_init[k] * rho[i]
+        )
+      }
+    }
+  }
+  
+  # Abundance initial values
+  N_init <- matrix(
+    0,
+    n_species_aug,
+    n_pops
+  )
+  
+  for(i in 1:n_species_aug){
+    for(k in 1:n_pops){
+      obs <- C[i,,k]
+      obs <- obs[!is.na(obs)]
+      
+      maxC <- ifelse(length(obs)==0,0,max(obs))
+      
+      if(presence[i,k]==1 &&
+         w_raw_init[i,k]==1){
+        # must be >= observed counts
+        N_init[i,k] <- max(
+          maxC,
+          1
+        ) + 20
+      } else {
+        N_init[i,k] <- 0
+      }
+    }
+  }
+  
+  
+  
+  list(
+    w_raw = w_raw_init,
+    N_actual = N_init,
+    eta = rnorm(n_species_aug, 0, 1),
+    alpha = rnorm(n_pops,0,1),
+    
+    beta = rnorm(
+      n_pops,0,1),
+    
+    omega = omega_init,
+    mu_alpha = 0,
+    sigma_alpha = 1,
+    mu_beta = 0,
+    sigma_beta = 1,
+    mu_eta = 0,
+    sigma_eta = 1
+  )
+}
+
+inits_sim <- list(
+  make_inits_sim(
+    C_aug,
+    presence_aug,
+    rho_aug
+  ),
+  
+  make_inits_sim(
+    C_aug,
+    presence_aug,
+    rho_aug
+  ),
+  
+  make_inits_sim(
+    C_aug,
+    presence_aug,
+    rho_aug
+  )
+)
+
+# Model fit
+fit_sim <- jags(
+  data = data_list_sim,
+  inits = inits_sim,
+  parameters.to.save = params,
+  model.file = "model.txt",
+  n.chains = 3,
+  n.iter = 20000,
+  n.burnin = 5000,
+  n.thin = 5
+)
+
+write.csv(fit_sim$BUGSoutput$summary, "mcmc_sim.csv")
+save(fit_sim, file = "fit_sim_R2jags.RData")
+
+# Model diagnostics
+post <- fit_sim$BUGSoutput$sims.list
+
+# 1) Abundance recovery
+N_est <- apply(
+  post$N_actual,
+  c(2,3),
+  mean
+)
+
+N_est_real <- N_est[1:n_species, ]
+
+df_N <- data.frame(
+  true = as.vector(N_true),
+  estimated = as.vector(N_est_real)
+)
+
+g1 <- ggplot(df_N, aes(x = true, y = estimated)) +
+  geom_point(size = 3) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", linewidth = 1) +
+  labs(
+    x = "True abundance",
+    y = "Estimated abundance"
+  )
+
+# 2) Beta recovery
+beta_est <- apply(post$beta, 2, mean)
+
+df_beta <- data.frame(
+  true = beta_true,
+  estimated = beta_est
+)
+
+g2 <- ggplot(df_beta, aes(x = true, y = estimated)) +
+  geom_point(size = 3) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", linewidth = 1) +
+  labs(
+    x = "True beta",
+    y = "Estimated beta"
+  )
+
+# 3) Omega recovery
+omega_est <- apply(post$omega, 2, mean)
+
+df_omega <- data.frame(
+  true = omega_true,
+  estimated = omega_est
+)
+
+g3 <- ggplot(df_omega, aes(x = true, y = estimated)) +
+  geom_point(size = 3) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", linewidth = 1) +
+  labs(
+    x = "True omega",
+    y = "Estimated omega"
+  )
+
+# 4) Detection probability recovery
+p_est <- apply(post$p, 2, mean)
+
+df_p <- data.frame(
+  true = p_true,
+  estimated = p_est[1:n_species]
+)
+
+g4 <- ggplot(df_p, aes(x = true, y = estimated)) +
+  geom_point(size = 3) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", linewidth = 1) +
+  labs(
+    x = "True detection probability",
+    y = "Estimated detection probability"
+  )
+
+(g1 + g2) / (g3 + g4)

@@ -14,7 +14,7 @@ output:
 # Load required packages
 ```{r setup, message=FALSE, warning=FALSE}
 library(tidyverse) # data handling
-library(dplyr) # data handling xx
+library(dplyr) # data handling
 library(tidyr) # data handling
 library(purrr) # data handling
 library(ggplot2) # plots
