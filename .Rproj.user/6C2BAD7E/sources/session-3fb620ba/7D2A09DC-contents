@@ -54,7 +54,16 @@ mean_plant_data <- fruit_data %>%
     xDiam   = mean(diam_mm, na.rm = TRUE),
     xNseeds = mean(Nseeds, na.rm = TRUE),
     xSugar  = mean(sugar_brix, na.rm = TRUE),
+    xPulpSeed = mean(pulpseedRatio, na.rm = TRUE),
     .groups = "drop"
+  )
+
+mean_plant_data <- mean_plant_data %>% 
+  mutate(
+    across(
+      c(xDiam, xNseeds, xSugar, xPulpSeed),
+      as.numeric
+    )
   )
 
 # Sample sizes per population
@@ -62,14 +71,25 @@ fruit_data %>%
   group_by(populationID) %>% 
   summarise(n_fruit = n())
 
-# Correlation matrices by population
-cors_by_pop <- mean_plant_data %>% 
-  group_by(populationID) %>% 
-  nest() %>% 
+# Correlations by population
+plant_cor <- mean_plant_data %>%
   mutate(
-    cor_matrix = map(data, ~ cor(.x[, c("xDiam", "xNseeds", "xSugar")],
-                                use = "pairwise.complete.obs"))
+    xDiam    = as.numeric(xDiam),
+    xNseeds  = as.numeric(xNseeds),
+    xSugar   = as.numeric(xSugar),
+    xPulpSeed = as.numeric(xPulpSeed)
   )
+
+populations <- split(plant_cor, plant_cor$populationID)
+
+cors_by_pop <- lapply(populations, function(df) {
+  
+  round(cor(
+    df[, c("xDiam", "xNseeds", "xSugar", "xPulpSeed")],
+    use = "pairwise.complete.obs"
+  ), 2)
+  
+})
 
 # Print results
 cors_by_pop$cor_matrix %>% map(~ round(.x, 3))
@@ -107,36 +127,64 @@ ggplot(plant_data, aes(x = populationID, fill = support_group)) +
 
 # Fit GAM models per population
 ```{r gams, cache = TRUE}
-df_models <- plant_data %>%
-  group_by(populationID) %>%
-  nest() %>%
-  mutate(
-    data_scaled = map(data, ~ {
-      z <- scale(data.frame(
-        zcrop  = .x$fruit_crop,
-        zdiam  = .x$xDiam,
-        zseeds = .x$xNseeds
-      )) %>% as.data.frame()
-      
-      na.omit(bind_cols(z, W = .x$pecked_fruits))
-    }),
-    k_val = map_int(data_scaled, ~ round(nrow(.x)/4)),
-    gam_fit = map2(data_scaled, k_val, ~
-      gam(W ~ s(zcrop, k = .y) +
-            s(zdiam, k = .y) +
-            s(zseeds, k = .y),
-          family = nb(),
-          data = .x)
+populations <- split(plant_data, plant_data$populationID)
+
+df_models <- lapply(names(populations), function(pop) {
+  
+  df <- populations[[pop]]
+  
+  # Convert to numeric
+  df$fruit_crop <- as.numeric(df$fruit_crop)
+  df$xDiam <- as.numeric(df$xDiam)
+  df$pecked_fruits <- as.numeric(df$pecked_fruits)
+  
+  # Standardize predictors
+  z <- scale(
+    data.frame(
+      zcrop = df$fruit_crop,
+      zdiam = df$xDiam
+    )
+  ) %>%
+    as.data.frame()
+  
+  # Data for the model
+  data_scaled <- na.omit(
+    bind_cols(
+      z,
+      W = df$pecked_fruits
     )
   )
+  
+  # k
+  k_val <- round(nrow(data_scaled)/4)
+  
+  # GAM
+  gam_fit <- gam(
+    W ~ s(zcrop, k = k_val) + s(zdiam, k = k_val),
+    family = nb(),
+    data = data_scaled
+  )
+  
+  data.frame(
+    populationID = pop,
+    data_scaled = I(list(data_scaled)),
+    k_val = k_val,
+    gam_fit = I(list(gam_fit))
+  )
+}) %>%
+  bind_rows()
 
 # Plot models
-df_smooths <- df_models %>%
-  mutate(
-    smooths = map(gam_fit, ~ smooth_estimates(.x))
-  ) %>%
-  select(populationID, smooths) %>%
-  unnest(smooths)
+smooths_list <- lapply(df_models$gam_fit, function(model) {
+  smooth_estimates(model)
+})
+
+df_smooths <- bind_rows(
+  lapply(seq_along(smooths_list), function(i) {
+    smooths_list[[i]] %>%
+      mutate(populationID = df_models$populationID[i])
+  })
+)
 
 df_crop <- df_smooths %>%
   filter(.smooth == "s(zcrop)") %>%      
@@ -157,26 +205,6 @@ p_crop <- df_crop %>%
   theme_bw()
 
 p_crop 
-
-df_seed <- df_smooths %>%
-  filter(.smooth == "s(zseeds)") %>%      
-  mutate(
-    x = zseeds,                           
-    estimate = .estimate,
-    lower = .estimate - 2*.se,
-    upper = .estimate + 2*.se
-  ) %>%
-  select(populationID, x, estimate, lower, upper)
-
-p_seed <- df_seed %>%
-  ggplot(aes(x = x, y = estimate)) +
-  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2) +
-  geom_line(size = 1) +
-  facet_wrap(~ populationID, ncol = 5, scales = "free") +
-  labs(x = "Seed number (scaled)", y = "Partial effect on W") +
-  theme_bw()
-
-p_seed 
 
 df_diam <- df_smooths %>%
   filter(.smooth == "s(zdiam)") %>%      
@@ -556,8 +584,7 @@ for(i in 1:npops){
 pop <- subset(plant_data, populationID == popsID[i])
 
 # Standardized traits
-z <- scale(data.frame(zcrop = pop$fruit_crop, zdiam = pop$xDiam,
-                 zseeds = pop$xNseeds))
+z <- scale(data.frame(zcrop = pop$fruit_crop, zdiam = pop$xDiam))
 
 # Fitness (number of pecked fruits)
 W <- pop$pecked_fruits
@@ -565,13 +592,12 @@ W <- pop$pecked_fruits
 # Fitness function
 trait_fitness <- na.omit(data.frame(z, W))
 k <- round((1/4)*nrow(trait_fitness), 0) # k = 1/4 of sample size
-ff <- gam(W ~ s(zcrop) + s(zdiam) + s(zseeds, k = k),
+ff <- gam(W ~ s(zcrop) + s(zdiam),
           family = nb(), data = trait_fitness)
 
 # Selection gradients 
 sel.grads <- gam.gradients(mod = ff, 
-                       phenotype = c("zcrop", "zdiam",
-                                     "zseeds"), 
+                       phenotype = c("zcrop", "zdiam"), 
               covariates = NULL, standardized = TRUE, 
               se.method = "boot.para", n.boot = 1000, 
               parallel = "no", ncpus = 1, refit.smooth = FALSE)
