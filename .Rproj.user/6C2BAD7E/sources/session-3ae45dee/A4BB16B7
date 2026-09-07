@@ -1,27 +1,27 @@
 {
-    "id": "7D2A09DC",
+    "id": "A4BB16B7",
     "path": "~/GitHub/Passiflora-geographic-mosaic/Passionflower geographic mosaic.Rmd",
     "project_path": "Passionflower geographic mosaic.Rmd",
     "type": "r_markdown",
-    "hash": "3867489001",
+    "hash": "0",
     "contents": "",
     "dirty": false,
-    "created": 1781779495516.0,
+    "created": 1788580691742.0,
     "source_on_save": false,
-    "relative_order": 2,
+    "relative_order": 1,
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "1029,56",
-        "scrollLine": "1020",
-        "last_setup_crc32": "1c232273c7c2da2f"
+        "cursorPosition": "901,20",
+        "scrollLine": "896",
+        "last_setup_crc32": "3ae45dee237bee12"
     },
-    "folds": "",
-    "lastKnownWriteTime": 1788231309,
+    "folds": "432|20|761|0|\n",
+    "lastKnownWriteTime": 1788753167,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1788231309153,
+    "last_content_update": 1788778203455,
     "read_only": false,
     "read_only_alternatives": []
 }

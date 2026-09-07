@@ -29,6 +29,8 @@ library(gdm) # GDM
 library(here) # for path reading
 library(sf) # coordinate projection
 library(rnaturalearth) # maps
+library(geodata) # download bioclimatic variables
+library(terra) # extract bioclimatic data 
 library(stringr) # string handling
 library(scales) # colors
 
@@ -777,7 +779,7 @@ W <- pop$pecked_fruits
 # Fitness function
 trait_fitness <- na.omit(data.frame(z, W))
 k <- round((1/4)*nrow(trait_fitness), 0) # k = 1/4 of sample size
-ff <- gam(W ~ s(zcrop) + s(zdiam),
+ff <- gam(W ~ s(zcrop, k = k) + s(zdiam, k = k),
           family = nb(), data = trait_fitness)
 
 # Selection gradients 
@@ -1126,7 +1128,6 @@ sim_matrix <- compare_linear_gradients(betas,
 sim_mat <- sim_matrix$cosine_matrix
 # write.csv(sim_mat, "beta_sim.csv")
 
-library(pheatmap)
 pheatmap(
   sim_mat,
   cluster_rows = TRUE,
@@ -1452,6 +1453,80 @@ coords[10, 2] <- -65.26979233 # Longitude Tucuman
 coords[10, 3] <- -26.80470395 # Latitude Tucuman
 coords[c(4,5), ] <- coords[c(5,4), ] # switch LZ and LP
 
+# Obtain environmental data
+bio <- worldclim_global(
+  var = "bio",
+  res = 5,
+  path = "WorldClim"
+)
+
+# conver coords to spatial points
+pts <- vect(
+  coords,
+  geom = c("Long", "Lat"),
+  crs = "EPSG:4326"
+)
+
+# extract 19 bioclimatic variables
+bio_values <- terra::extract(bio, pts)
+
+# combine with original data
+datos_bio <- cbind(
+  coords,
+  bio_values[, -1]
+)
+
+# bioclimatic variables
+bio_vars <- grep(
+  "^wc2\\.1_5m_bio_",
+  names(datos_bio),
+  value = TRUE
+)
+
+
+# Make a plot for each BIO
+plots <- lapply(bio_vars, function(v) {
+  
+  # correlación
+  test <- cor.test(
+    datos_bio$Lat,
+    datos_bio[[v]],
+    method = "pearson"
+  )
+  
+  r <- unname(test$estimate)
+  p <- test$p.value
+  
+  # texto para el gráfico
+  label <- paste0(
+    "r = ", round(r, 2),
+    "\np = ", format.pval(p, digits = 2, eps = 0.001)
+  )
+  
+  ggplot(datos_bio, aes(x = Lat, y = .data[[v]])) +
+    geom_point(size = 3) +
+    geom_smooth(
+      method = "lm",
+      se = FALSE
+    ) +
+    annotate(
+      "text",
+      x = Inf,
+      y = Inf,
+      label = label,
+      hjust = 1.1,
+      vjust = 1.3,
+      size = 3.5
+    ) +
+    labs(
+      x = "Latitude",
+      y = sub("wc2\\.1_5m_", "", v)
+    )
+})
+
+wrap_plots(plots, ncol = 4)
+
+# Prediction data for GDM
 predData <- data.frame(
   site = sites_num,
   Long = coords$Long,
