@@ -1,0 +1,10 @@
+"0","# Map
+arg <- ne_countries(
+  scale = ""medium"",
+  country = ""Argentina"",
+  returnclass = ""sf""
+)
+"
+"2","Error in ne_countries(scale = ""medium"", country = ""Argentina"", returnclass = ""sf"") : 
+  could not find function ""ne_countries""
+"
