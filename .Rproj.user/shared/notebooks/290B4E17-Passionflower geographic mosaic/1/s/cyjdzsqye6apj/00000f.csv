@@ -1,4 +1,0 @@
-"0","populations <- split(plant_data, plant_data$populationID)
-"
-"2","Error: object 'plant_data' not found
-"

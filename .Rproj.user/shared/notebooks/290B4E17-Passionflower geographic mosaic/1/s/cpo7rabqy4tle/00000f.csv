@@ -1,0 +1,11 @@
+"0","# build the GDM site-pair table
+gdmTab4 <- formatsitepair(
+  bioData = gdmTab3,     # dissimilarity matrix with 'site' column
+  bioFormat = 4,            # dissimilarity matrix
+  siteColumn = ""site"",
+  predData  = predData_proj,    # REQUIRED for format 4
+  distPreds = distPreds_list
+)
+"
+"2","Error: object 'gdmTab3' not found
+"
