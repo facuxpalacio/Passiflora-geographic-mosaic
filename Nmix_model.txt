@@ -1,0 +1,87 @@
+
+model {
+
+  ############################################################
+  # Detection model
+  ############################################################
+
+  for (i in 1:n_species) {
+
+    logit(p[i]) <- eta[i]
+
+    eta[i] ~ dnorm(mu_p, tau_p)
+
+  }
+
+
+  ############################################################
+  # Ecological process
+  ############################################################
+
+  for (k in 1:n_pops) {
+
+    for (i in 1:n_species) {
+
+      ########################################################
+      # Expected local abundance
+      #
+      # alpha = baseline abundance
+      # beta  = effect of regional abundance
+      # gamma = effect of degree of frugivory
+      #
+      # presence_by_pop imposes the deterministic
+      # geographic distribution constraint
+      ########################################################
+
+      lambda[i,k] <- presence_by_pop[i,k] * exp(
+        alpha +
+        beta * log_pool[i,k] +
+        gamma * rho[i]
+      )
+
+
+      ########################################################
+      # Latent local abundance
+      ########################################################
+
+      N[i,k] ~ dpois(lambda[i,k])
+
+
+      ########################################################
+      # Observation model
+      ########################################################
+
+      for (j in 1:n_plants[k]) {
+
+        C[i,j,k] ~ dbin(
+          p[i],
+          N[i,k]
+        )
+
+      }
+    }
+  }
+
+
+  ############################################################
+  # Global ecological parameters
+  ############################################################
+
+  alpha ~ dnorm(0, 0.01)
+
+  beta ~ dnorm(0, 0.01)
+
+  gamma ~ dnorm(0, 0.01)
+
+
+  ############################################################
+  # Hierarchical detection model
+  ############################################################
+
+  mu_p ~ dnorm(0, 0.1)
+
+  tau_p <- pow(sigma_p, -2)
+
+  sigma_p ~ dunif(0, 5)
+
+}
