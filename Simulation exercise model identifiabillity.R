@@ -61,11 +61,14 @@ log_pool <- matrix(
   ncol = n_pops
 )
 
-log_pool_c <- sweep(
-  log_pool,
-  2,
-  colMeans(log_pool)
-)
+
+# ---- Center covariates ----
+
+mean_log_pool <- mean(log_pool)
+mean_rho <- mean(rho)
+
+log_pool_c <- log_pool - mean_log_pool
+rho_c <- rho - mean_rho
 
 
 # ---- Presence/absence mask ----
@@ -107,7 +110,7 @@ for (i in 1:n_species) {
         exp(
           alpha_true +
             beta_true * log_pool_c[i, k] +
-            gamma_true * rho[i]
+            gamma_true * rho_c[i]
         )
       
       N_true[i, k] <- rpois(
@@ -169,6 +172,7 @@ data_list_sim <- list(
   C = C_sim,
   log_pool_c = log_pool_c,
   rho = rho,
+  rho_c = rho_c, 
   n_species = n_species,
   n_pops = n_pops,
   n_plants = n_plants,
@@ -300,7 +304,16 @@ model {
     eta[i] ~ dnorm(mu_p, tau_p)
 
   }
+  
+  ############################################################
+  # Frugivory-based occurrence constraint
+  ############################################################
 
+  for (i in 1:n_species) {
+
+    M[i] <- step(rho[i] - 1.0E-10)
+
+  }
 
   ############################################################
   # Ecological process
@@ -314,10 +327,10 @@ model {
       # Regional abundance + frugivory
       ########################################################
 
-      lambda[i,k] <- presence_by_pop[i,k] * exp(
+      lambda[i,k] <- presence_by_pop[i,k] * M[i] * exp(
         alpha +
         beta * log_pool_c[i,k] +
-        gamma * rho[i]
+        gamma * rho_c[i]
       )
 
 
@@ -490,10 +503,7 @@ quantile(
   na.rm = TRUE
 )
 
-mean(metrics_N$n.eff < 50, na.rm = TRUE) * 100
 mean(metrics_N$n.eff < 100, na.rm = TRUE) * 100
-mean(metrics_N$n.eff < 200, na.rm = TRUE) * 100
-mean(metrics_N$n.eff < 500, na.rm = TRUE) * 100
 
 metrics_N %>%
   arrange(n.eff) %>%

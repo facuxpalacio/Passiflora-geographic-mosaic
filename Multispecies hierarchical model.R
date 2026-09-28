@@ -1,6 +1,8 @@
 # Load packages
 library(here)
 library(R2jags)
+library(MCMCvis)
+library(coda)
 library(ggplot2)
 library(patchwork)
 
@@ -78,55 +80,77 @@ list_counts <- lapply(files, function(f) {
 
 n_pops <- length(list_counts)
 
-n_species_obs <- nrow(list_counts[[1]])
-
 n_species_aug <- length(rho)
-
-n_augmented <- n_species_aug - n_species_obs
 
 n_plants <- sapply(list_counts, ncol)
 
 max_reps <- max(n_plants)
 
-species_names <- rho_df$code
-
-names_sp_obs <- rownames(list_counts[[1]])
-
-names_sp_nonobs <- species_names[
-  !species_names %in% names_sp_obs
-]
+species_names <- names(rho)
 
 
 # ============================================================
-# Augment count matrices with unobserved species
+# Check that all observed species are included in rho
+# ============================================================
+
+all_observed_species <- unique(
+  unlist(
+    lapply(list_counts, rownames)
+  )
+)
+
+missing_from_rho <- setdiff(
+  all_observed_species,
+  species_names
+)
+
+if (length(missing_from_rho) > 0) {
+  
+  stop(
+    paste(
+      "These observed species are missing from rho:",
+      paste(missing_from_rho, collapse = ", ")
+    )
+  )
+}
+
+
+# ============================================================
+# Augment count matrices
+# species × plants
 # ============================================================
 
 list_counts_aug <- lapply(list_counts, function(mat) {
   
-  padded <- rbind(
-    mat,
-    matrix(
-      0,
-      nrow = n_augmented,
-      ncol = ncol(mat)
+  out <- matrix(
+    0,
+    nrow = n_species_aug,
+    ncol = ncol(mat),
+    dimnames = list(
+      species_names,
+      colnames(mat)
     )
   )
   
-  rownames(padded) <- c(
-    names_sp_obs,
-    names_sp_nonobs
+  common_species <- intersect(
+    rownames(mat),
+    species_names
   )
   
-  padded_ordered <- padded[
-    order(rownames(padded)),
-  ]
+  out[common_species, ] <- mat[common_species, ]
   
-  return(padded_ordered)
+  out
 })
 
 
+# ============================================================
 # Check dimensions
-sapply(list_counts_aug, dim)
+# ============================================================
+
+sapply(
+  list_counts_aug,
+  dim
+)
 
 
 # ============================================================
@@ -253,6 +277,17 @@ model {
 
 
   ############################################################
+  # Frugivory-based occurrence constraint
+  ############################################################
+
+  for (i in 1:n_species) {
+
+    M[i] <- step(rho[i] - 1.0E-10)
+
+  }
+
+
+  ############################################################
   # Ecological process
   ############################################################
 
@@ -260,21 +295,10 @@ model {
 
     for (i in 1:n_species) {
 
-      ########################################################
-      # Expected local abundance
-      #
-      # alpha = baseline abundance
-      # beta  = effect of regional abundance
-      # gamma = effect of degree of frugivory
-      #
-      # presence_by_pop imposes the deterministic
-      # geographic distribution constraint
-      ########################################################
-
-      lambda[i,k] <- presence_by_pop[i,k] * exp(
+      lambda[i,k] <- presence_by_pop[i,k] * M[i] * exp(
         alpha +
-        beta * log_pool[i,k] +
-        gamma * rho[i]
+        beta * log_pool_c[i,k] +
+        gamma * rho_c[i]
       )
 
 
@@ -330,10 +354,18 @@ model {
 # Data list for JAGS
 # ============================================================
 
+# Center covariates
+mean_log_pool <- mean(log_pool)
+mean_rho <- mean(rho)
+
+log_pool_c <- log_pool - mean_log_pool
+rho_c <- rho - mean_rho
+
 data_list <- list(
   C = C,
-  log_pool = log_pool,
-  rho = rho,
+  log_pool_c = log_pool_c,
+  rho = rho, # original rho for M
+  rho_c = rho_c, # centered rho for gamma
   n_species = n_species_aug,
   n_pops = n_pops,
   n_plants = n_plants,
@@ -349,22 +381,11 @@ set.seed(2026)
 
 make_inits <- function() {
   
-  # ----------------------------------------------------------
-  # Initial detection probabilities
-  # ----------------------------------------------------------
-  
   eta_init <- rnorm(
     n_species_aug,
     0,
     1
   )
-  
-  
-  # ----------------------------------------------------------
-  # Initial latent abundance
-  #
-  # Must be >= maximum observed count
-  # ----------------------------------------------------------
   
   N_init <- matrix(
     1,
@@ -385,7 +406,10 @@ make_inits <- function() {
         max(obs)
       )
       
-      if (presence_by_pop[i, k] == 1) {
+      if (
+        presence_by_pop[i, k] == 1 &&
+        rho[i] > 0
+      ) {
         
         N_init[i, k] <- max(
           maxC + 1,
@@ -400,27 +424,14 @@ make_inits <- function() {
     }
   }
   
-  
-  # ----------------------------------------------------------
-  # Initial global ecological parameters
-  # ----------------------------------------------------------
-  
   list(
-    
     N = N_init,
-    
     eta = eta_init,
-    
     alpha = rnorm(1, 0, 1),
-    
     beta = rnorm(1, 0, 1),
-    
     gamma = rnorm(1, 0, 1),
-    
     mu_p = 0,
-    
     sigma_p = 1
-    
   )
 }
 
@@ -465,13 +476,13 @@ fit <- jags(
   
   model.file = "Nmix_model.txt",
   
-  n.chains = 3,
+  n.chains = 4,
   
-  n.iter = 30000,
+  n.iter = 120000,
   
-  n.burnin = 8000,
+  n.burnin = 20000,
   
-  n.thin = 5
+  n.thin = 10
   
 )
 
@@ -480,15 +491,15 @@ fit <- jags(
 # Save / load
 # ============================================================
 
-# write.csv(
-#   fit$BUGSoutput$summary,
-#   "mcmc.csv"
-# )
+ write.csv(
+   fit$BUGSoutput$summary,
+   "mcmcb.csv"
+ )
 
-# save(
-#   fit,
-#   file = "fit_R2jags.RData"
-# )
+ save(
+   fit,
+   file = "fit_R2bjags.RData"
+ )
 
 # load("fit_R2jags.RData")
 
@@ -512,24 +523,25 @@ max(
   na.rm = TRUE
 )
 
-
-# ============================================================
-# Effective sample size
-# ============================================================
-
-neff <- summary_fit[, "n.eff"]
+Neff <- summary_fit[, "n.eff"]
 
 hist(
-  neff,
-  main = "Effective sample size",
+  Neff,
+  main = "Neff",
   xlab = "Neff"
 )
 
-mean(
-  neff < 100,
+max(
+  Neff,
   na.rm = TRUE
 )
 
+mcmc <- as.mcmc(fit)
+
+traceplot(
+  mcmc[, c("alpha","beta","gamma")],
+  smooth = FALSE
+)
 
 # ============================================================
 # Posterior estimates of ecological parameters
@@ -548,8 +560,6 @@ summary_fit[
 # Posterior latent abundance
 # ============================================================
 
-library(MCMCvis)
-
 N_post <- MCMCchains(
   fit,
   params = "N"
@@ -561,64 +571,39 @@ N_mean <- apply(
   mean
 )
 
-N_mean <- matrix(
+N_latent <- matrix(
   N_mean,
   nrow = n_species_aug,
   ncol = n_pops
 )
 
+rownames(N_latent) <- rownames(list_counts_aug[[1]])
 
-# ============================================================
-# Convert posterior abundance to population-specific matrices
-# ============================================================
+colnames(N_latent) <- pool_df$poblacion.ID
 
-list_Nmean <- vector(
-  "list",
-  n_pops
-)
+N_latent
+
+# Compare with observed visits
+N_med <- matrix(N_latent, nrow = n_species_aug, ncol = n_pops)
+
+list_Nmed <- vector("list", n_pops)
 
 for (k in 1:n_pops) {
-  
-  n_pl <- n_plants[k]
-  
+  n_pl <- n_plants[k]           
   mat_k <- matrix(
-    N_mean[, k],
+    N_med[, k],                 
     nrow = n_species_aug,
-    ncol = n_pl
+    ncol = n_plants[k]
   )
   
-  rownames(mat_k) <- rownames(
-    list_counts_aug[[k]]
-  )
+  rownames(mat_k) <- rownames(list_counts_aug[[k]])
+  colnames(mat_k) <- colnames(list_counts_aug[[k]])
   
-  colnames(mat_k) <- colnames(
-    list_counts_aug[[k]]
-  )
-  
-  list_Nmean[[k]] <- mat_k
+  list_Nmed[[k]] <- mat_k
 }
 
+obs_all <- unlist(list_counts_aug)
+pred_all <- unlist(list_Nmed)
 
-# ============================================================
-# Compare observed counts with posterior mean abundance
-# ============================================================
-
-obs_all <- unlist(
-  list_counts_aug
-)
-
-pred_all <- unlist(
-  list_Nmean
-)
-
-plot(
-  obs_all,
-  pred_all,
-  xlab = "Observed visits",
-  ylab = "Posterior mean latent abundance"
-)
-
-abline(
-  a = 0,
-  b = 1
-)
+plot(obs_all, pred_all) # should be above the 1:1 line
+abline(a = 0, b = 1)

@@ -7,7 +7,7 @@ parcor	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NA	0	0	NA
 pasdom	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
 pipbon	0	0	NA	0	0	0	0	0	0	0	0	0	0	1	0	0	0	0	NA	0	0	NA
 pitsul	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	2	0	0	0	NA	0	0	NA
-trhsay	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NA	0	0	NA
+thrsay	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NA	0	0	NA
 turruf	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NA	0	0	NA
 turama	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NA	0	0	NA
 tyrmel	0	0	NA	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NA	0	0	NA

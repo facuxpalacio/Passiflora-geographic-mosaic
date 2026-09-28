@@ -1302,7 +1302,6 @@ vec_phy <- as.vector(phyD[lower.tri(phyD)])
 mean(vec_phy,na.rm=T)
 sd(vec_phy,na.rm=T)
 100*sd(vec_phy,na.rm=T)/mean(vec_phy,na.rm=T)
-
 ```
 
 # Generalized dissimilarity modeling
@@ -1323,7 +1322,10 @@ nonlin_grad[,1] <- 1:nrow(nonlin_grad)
 dim(nonlin_grad) # first column = site
 
 ##### Beta-diversity (Bray-Curtis) (predictor 1) 
-beta_div <- read.csv(here("data", "comp_div.csv"))[,-1]
+comm_matrix <- read.csv(here("data", "comm_passionflower.csv"))
+prop_mat <- t(apply(comm_matrix[,-1], 1, function(x) x/sum(x)))
+beta_div <- as.matrix(vegdist(prop_mat, method = "bray"))
+rownames(beta_div) <- colnames(beta_div) <- comm_matrix$X
 
 vec_comp <- as.vector(beta_div[lower.tri(beta_div)])
 mean(vec_comp,na.rm=T)
@@ -1360,7 +1362,7 @@ FD_BM <- FD_BM[ord, ord]
 
 # Create numeric site IDs
 sites_char <- rownames(FD_BM)
-sites_num  <- 1:length(FD_BM)
+sites_num  <- 1:nrow(FD_BM)
 
 # Create numeric-labeled distance matrix for GDM
 FD_BM_numeric <- FD_BM
@@ -1381,7 +1383,7 @@ FD_strat <- FD_strat[ord, ord]
 
 # Create numeric site IDs
 sites_char <- rownames(FD_strat)
-sites_num  <- 1:length(FD_strat)
+sites_num  <- 1:nrow(FD_strat)
 
 # Create numeric-labeled distance matrix for GDM
 FD_strat_numeric <- FD_strat
@@ -1402,7 +1404,7 @@ FD_harv <- FD_harv[ord, ord]
 
 # Create numeric site IDs
 sites_char <- rownames(FD_harv)
-sites_num  <- 1:length(FD_harv)
+sites_num  <- 1:nrow(FD_harv)
 
 # Create numeric-labeled distance matrix for GDM
 FD_harv_numeric <- FD_harv
@@ -1582,7 +1584,8 @@ plots <- lapply(seq_along(env_vars), function(i) {
 })
 wrap_plots(plots, ncol = 4)
 
-# Prediction data for GDM
+###############################
+### Prediction data for GDM ###
 predData <- data.frame(
   site = sites_num,
   Long = coords$Long,
@@ -1662,6 +1665,52 @@ phyD_numeric <- data.frame(site = sites_num,
 
 ```
 
+## Collinearity between predictors
+```{r corrs}
+matrices <- list(
+  beta_div  = beta_div,
+  FD_BM     = FD_BM,
+  FD_strat  = FD_strat,
+  FD_harv   = FD_harv,
+  pop_dist  = pop_dist[,-1],
+  geo_dist  = geo_dist[,-1],
+  phyD      = phyD
+)
+
+matrices <- lapply(matrices, as.matrix)
+
+n <- length(matrices)
+
+corr_mantel <- matrix(
+  NA,
+  nrow = n,
+  ncol = n,
+  dimnames = list(names(matrices), names(matrices))
+)
+
+for (i in 1:n) {
+  for (j in 1:n) {
+    
+    if (i == j) {
+      corr_mantel[i, j] <- 1
+      
+    } else {
+      
+      res <- mantel(
+        matrices[[i]],
+        matrices[[j]],
+        method = "pearson",
+        permutations = 9999
+      )
+      
+      corr_mantel[i, j] <- res$statistic
+    }
+  }
+}
+
+round(corr_mantel, 2)
+```
+
 ## Comparison between taxonomic, functional and phylogenetic composition
 ```{r comp}
 scale_dist <- function(x){
@@ -1670,11 +1719,13 @@ scale_dist <- function(x){
 
 tax_std <- scale_dist(beta_div_numeric)
 FD_strat_std <- scale_dist(FD_strat_numeric)
+FD_harv_std <- scale_dist(FD_harv_numeric)
 FD_BM_std <- scale_dist(FD_BM_numeric)
 phy_std <- scale_dist(phyD_numeric)
 
 mean(tax_std[lower.tri(tax_std)])
 mean(FD_strat_std[lower.tri(FD_strat_std)])
+mean(FD_harv_std [lower.tri(FD_harv_std)])
 mean(FD_BM_std[lower.tri(FD_BM_std)])
 mean(phy_std[lower.tri(phy_std)])
 ```
@@ -1750,63 +1801,7 @@ ggplot() +
   ) +
   labs(
     x = "Geographic distance (projected meters)",
-    y = "Linear gradient dissimilarity") +
-  theme_bw()
-
-df_spline_m1 <- data.frame(
-  x = gdm.1.splineDat$x[, "matrix_4"],
-  y = gdm.1.splineDat$y[, "matrix_4"]
-)
-
-df_points_m1 <- gdmTab2 %>%
-  mutate(
-    ForStrat_comp = abs(s1.matrix_4 - s2.matrix_4)
-  )
-
-ggplot() +
-  geom_point(
-    data = df_points_m1,
-    aes(x = ForStrat_comp, y = distance),
-    size = 3
-  ) +
-  geom_line(
-    data = df_spline_m1,
-    aes(x = x, y = y),
-    linewidth = 1.2
-  ) +
-  xlim(1.5, 3.5) +
-  labs(
-    x = "Foraging stratum dissimilarity (mean pairwise distance)",
-    y = "Linear gradient dissimilarity"
-  ) +
-  theme_bw()
-
-df_spline_m1 <- data.frame(
-  x = gdm.1.splineDat$x[, "matrix_6"],
-  y = gdm.1.splineDat$y[, "matrix_6"]
-)
-
-df_points_m1 <- gdmTab2 %>%
-  mutate(
-    phylo_comp = abs(s1.matrix_6 - s2.matrix_6)
-  )
-
-ggplot() +
-  geom_point(
-    data = df_points_m1,
-    aes(x = phylo_comp, y = distance),
-    size = 3
-  ) +
-  geom_line(
-    data = df_spline_m1,
-    aes(x = x, y = y),
-    linewidth = 1.2
-  ) +
-  xlim(40, 120) +
-  labs(
-    x = "Phylogenetic distance (mean pairwise distance)",
-    y = "Linear gradient dissimilarity"
-  ) +
+    y = "Linear gradient dissimilarity") + ylim(0,1) +
   theme_bw()
 
 df_spline_m1 <- data.frame(
@@ -1816,26 +1811,26 @@ df_spline_m1 <- data.frame(
 
 df_points_m1 <- gdmTab2 %>%
   mutate(
-    ForStrat_comp = abs(s1.matrix_7 - s2.matrix_7)
+    pop = abs(s1.matrix_7 - s2.matrix_7)
   )
 
 ggplot() +
   geom_point(
     data = df_points_m1,
-    aes(x = ForStrat_comp, y = distance),
+    aes(x = pop, y = distance),
     size = 3
   ) +
   geom_line(
     data = df_spline_m1,
     aes(x = x, y = y),
     linewidth = 1.2
-  ) +
-  
+  ) + ylim(0,1) +
   labs(
-    x = "Human population size dissimilarity (mean pairwise distance)",
+    x = "log(Human population density dissimilarity) (mean pairwise distance)",
     y = "Linear gradient dissimilarity"
   ) +
   theme_bw()
+
 
 # Create initial site-pair table for nonlinear gradients (bioFormat = 3)
 gdmTab3 <- formatsitepair(
@@ -1910,19 +1905,19 @@ ggplot() +
   theme_bw()
 
 df_spline_m2 <- data.frame(
-  x = gdm.2.splineDat$x[, "matrix_4"],
-  y = gdm.2.splineDat$y[, "matrix_4"]
+  x = gdm.2.splineDat$x[, "matrix_7"],
+  y = gdm.2.splineDat$y[, "matrix_7"]
 )
 
 df_points_m2 <- gdmTab4 %>%
   mutate(
-    ForStrat2_comp = abs(s1.matrix_4 - s2.matrix_4)
+    pop2 = abs(s1.matrix_7 - s2.matrix_7)
   )
 
 ggplot() +
   geom_point(
     data = df_points_m2,
-    aes(x = ForStrat2_comp, y = distance),
+    aes(x = pop2, y = distance),
     size = 3
   ) +
   geom_line(
@@ -1931,7 +1926,7 @@ ggplot() +
     linewidth = 1.2
   ) +
   labs(
-    x = "Foraging stratum dissimilarity (mean pairwise distance)",
+    x = "log(Human population density dissimilarity) (mean pairwise distance)",
     y = "Non-linear gradient dissimilarity"
   ) +
   theme_bw()

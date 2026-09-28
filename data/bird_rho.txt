@@ -66,7 +66,7 @@ synalb	0.00
 tacleu	0.00
 tarmaj	0.00
 theacu	0.50
-trhsay	1.00
+thrsay	1.00
 troaed	0.00
 turama	0.56
 turchi	0.50
