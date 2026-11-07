@@ -31,7 +31,6 @@ log_pool <- t(log(pool_df[, -c(1, 2)] + 1))
 
 dim(log_pool)
 
-
 ### Binary mask for the distribution of species across populations
 presence_by_pop <- read.table(
   here("data", "presence_by_pop.txt"),
@@ -72,6 +71,18 @@ list_counts <- lapply(files, function(f) {
   
   mat
 })
+
+# Species richness per population
+list_species <- lapply(list_counts, function(mat) {
+  
+  # Presencia/ausencia de cada especie
+  mat_pa <- mat > 0
+  
+  # Número de especies presentes en la población
+  sum(rowSums(mat_pa,na.rm=T) > 0)
+})
+names(list_species) <- c("SM","CP","LZ","MG","LP","EC","ER","TU","SF","RA")
+unlist(list_species)
 
 
 # ============================================================

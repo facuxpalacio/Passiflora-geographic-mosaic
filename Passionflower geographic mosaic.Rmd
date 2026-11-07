@@ -98,10 +98,33 @@ cors_by_pop
 # Load plant-level data
 plant_data <- read.csv(here("data", "Passionflower_pops.csv"))
 
-# Sample sizes per population
+# Sample sizes and correlations per population
 plant_data %>% 
   group_by(populationID) %>% 
   summarise(n_plant = n())
+
+cor_crop_diam <- plant_data %>%
+  group_by(populationID) %>%
+  summarise(
+    n = sum(complete.cases(fruit_crop, xDiam)),
+    r = cor(fruit_crop, xDiam, use = "complete.obs", method = "pearson"),
+    p = cor.test(fruit_crop, xDiam, method = "pearson")$p.value,
+    .groups = "drop"
+  )
+
+cor_crop_diam
+
+# Area sampled per population
+areas <- plant_data %>%
+  filter(!is.na(longitude), !is.na(latitude)) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
+  group_by(populationID) %>%
+  summarise(geometry = st_combine(geometry)) %>%
+  st_convex_hull() %>%
+  mutate(area_ha = as.numeric(st_area(geometry))/10000) %>%
+  st_drop_geometry()
+mean(areas$area_ha)
+sd(areas$area_ha)
 
 # Group support types into broader categories
 plant_data <- plant_data %>%
@@ -237,7 +260,7 @@ moments.differentials<-function(z,W,n.boot=1000,standardized=FALSE){
   	results[1:(dim(results)[1]/2),]
 }
 
-traits <- c("fruit_crop", "xDiam", "xSugar")
+traits <- c("fruit_crop", "xDiam", "xSugar", "xPulpSeed")
 
 populations <- unique(plant_data$populationID)
 set.seed(1)
@@ -941,41 +964,28 @@ ggplot() +
     color = "black"
   ) +
   scale_fill_gradientn(
-    colours = c("blue", "white", "red"),
-    values = rescale(c(-max_abs_lin, 0, max_abs_lin)),
-    name = "Linear selection\n(β)"
-  ) +
+  colours = c("white", "yellow", "orange", "red"),
+  values = c(0, 0.33, 0.66, 1),
+  limits = c(0, max(plot_dat_lin$estimates, na.rm = TRUE)),
+  name = "Linear selection\n(β)"
+) +
   scale_size_continuous(
     name = "Selection intensity"
   ) +
   scale_alpha_identity() +
   facet_wrap(~trait) +
   coord_sf(
-    xlim = range(plot_dat_lin$Long) + c(-2,2),
-    ylim = range(plot_dat_lin$Lat) + c(-2,2)
+    xlim = range(plot_dat_lin$Long) + c(-2, 2),
+    ylim = range(plot_dat_lin$Lat) + c(-2, 2)
   ) +
   theme_classic() +
-  labs(
+  labs(title = "Linear selection",
     x = "Longitude",
     y = "Latitude"
   ) +
   theme(
     legend.position = "right"
   )
-
-# Quadratic gradients
-plot_dat_quad <- grads %>%
-  filter(str_detect(Parameter, "^G-"),
-         !str_detect(Parameter, "-z.*-z")) %>%
-  mutate(
-    trait = case_when(
-      Parameter == "G-zcrop"  ~ "Fruit crop size",
-      Parameter == "G-zdiam"  ~ "Mean fruit diameter"
-    ),
-    alpha_val = ifelse(P.value < 0.05, 1, 0.25)
-  )
-
-max_abs_quad <- max(abs(plot_dat_quad$estimates), na.rm = TRUE)
 
 ggplot() +
   geom_sf(
@@ -997,21 +1007,22 @@ ggplot() +
     color = "black"
   ) +
   scale_fill_gradientn(
-    colours = c("blue", "white", "red"),
-    values = rescale(c(-max_abs_quad, 0, max_abs_quad)),
-    name = "Quadratic selection\n(γii)"
-  ) +
+  colours = c("white", "yellow", "orange", "red"),
+  values = c(0, 0.33, 0.66, 1),
+  limits = c(0, max(plot_dat_quad$estimates, na.rm = TRUE)),
+  name = "Quadratic selection\n(γii)"
+) +
   scale_size_continuous(
     name = "Selection intensity"
   ) +
   scale_alpha_identity() +
   facet_wrap(~trait) +
   coord_sf(
-    xlim = range(plot_dat_quad$Long) + c(-2,2),
-    ylim = range(plot_dat_quad$Lat) + c(-2,2)
+    xlim = range(plot_dat_quad$Long) + c(-2, 2),
+    ylim = range(plot_dat_quad$Lat) + c(-2, 2)
   ) +
   theme_classic() +
-  labs(
+  labs(title = "Quadratic selection",
     x = "Longitude",
     y = "Latitude"
   ) +
@@ -1532,7 +1543,7 @@ plots <- lapply(seq_along(env_vars), function(i) {
       }
     )
 })
-wrap_plots(plots, ncol = 4)
+patchwork::wrap_plots(plots, ncol = 4)
 
 # Make a plot for each variable across longitud
 plots <- lapply(seq_along(env_vars), function(i) {
@@ -1582,7 +1593,7 @@ plots <- lapply(seq_along(env_vars), function(i) {
       }
     )
 })
-wrap_plots(plots, ncol = 4)
+patchwork::wrap_plots(plots, ncol = 4)
 
 ###############################
 ### Prediction data for GDM ###

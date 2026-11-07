@@ -1,1 +1,0 @@
-{"frames":[],"message":"Error in ne_countries(scale = \"medium\", country = \"Argentina\", returnclass = \"sf\") : \n  could not find function \"ne_countries\"\n"}
